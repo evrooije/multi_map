@@ -14,35 +14,36 @@ settings.seed = 835726
 math.randomseed(settings.seed)
 
 for i = settings.number_of_layers / -2, settings.number_of_layers / 2 do
+	local height_map_seed = math.random(-1000000000000, 1000000000000)
+	local terrain_type_seed = math.random(-1000000000000, 1000000000000)
+	local mountain_peak_seed = math.random(-1000000000000, 1000000000000)
+
 	layers[i] = {
-		height_map_seed = math.random(-1000000000000, 1000000000000),
 		height_map_params = {
 		   offset = 0,
 		   scale = 50,
 		   spread = {x=2048, y=2048, z=2048},
-		   seed = settings.height_map_seed,
+		   seed = height_map_seed,
 		   octaves = 7,
 		   persist = 0.7
 		},
 		height_map = nil,
 		height_map_2dmap = {},
-		terrain_type_seed = math.random(-1000000000000, 1000000000000),
 		terrain_type_params = {
 		   offset = 2.5,
 		   scale = 2.5,
 		   spread = {x=1024, y=1024, z=1024},
-		   seed = settings.terrain_type_seed,
+		   seed = terrain_type_seed,
 		   octaves = 6,
 		   persist = 0.6
 		},
 		terrain_type_map = nil,
 		terrain_type_2dmap = {},
-		mountain_map_seed = math.random(-1000000000000, 1000000000000),
 		mountain_peak_params = {
 		   offset = -75,
 		   scale = 125,
 		   spread = {x=256, y=256, z=256},
-		   seed = settings.mountain_peak_seed,
+		   seed = mountain_peak_seed,
 		   octaves = 7,
 		   persist = 0.6
 		},
