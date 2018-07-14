@@ -4,8 +4,8 @@ local layers = {}
 settings.number_of_layers = 32
 settings.day_light = 15
 settings.night_light = 0
-settings.bedrock = "default:bedrock"
-settings.skyrock = "default:skyrock"
+settings.bedrock = "multi_map:bedrock"
+settings.skyrock = "multi_map:skyrock"
 
 settings.water_height = 0
 
@@ -138,35 +138,12 @@ local perlin_worm_start_params = {
 	persist = 0.7
 }
 
-minetest.register_node("default:skyrock", {
-	description = "Multi Map Impenetrable Skyblock",
-	drawtype = "airlike",
-	tiles ={"star_button.png"},
-	inventory_image = "star_button.png",
-	is_ground_content = false,
-	walkable = true,
-	pointable = false,
-	diggable = false,
-	climbable = false,
-})
-
-minetest.register_node("default:bedrock", {
-	description = "Multi Map Impenetrable Bedrock",
-	drawtype = "normal",
-	tiles ={"multi_map_bedrock.png"},
-	is_ground_content = false,
-	walkable = true,
-	pointable = false,
-	diggable = false,
-	climbable = false,
-})
-
 minetest.register_on_generated(function(minp, maxp)
 	local c_stone = minetest.get_content_id("default:stone")
 	local c_air = minetest.get_content_id("air")
 	local c_water = minetest.get_content_id("default:water_source")
-	local c_bedrock = minetest.get_content_id("default:bedrock")
-	local c_skyrock = minetest.get_content_id("default:skyrock")
+	local c_bedrock = minetest.get_content_id(settings.bedrock)
+	local c_skyrock = minetest.get_content_id(settings.skyrock)
 
 	local current_layer = nil
 
