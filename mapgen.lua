@@ -202,6 +202,7 @@ minetest.register_on_generated(function(minp, maxp)
 	local nixz = 1
 
 	local worm_started = false
+	local supress_shadow = false
 
 	for z = minp.z, maxp.z do
 		local niz
@@ -216,10 +217,11 @@ minetest.register_on_generated(function(minp, maxp)
 					height = height + layers[current_layer].mountain_peak_2dmap[nixz]
 				end
 
-				if (layer_height * current_layer) - half_layer_height <= y and y <= (layer_height * current_layer) - half_layer_height + (sidelen / 2) then
+				if (layer_height * current_layer) + half_layer_height < y and y <= (layer_height * current_layer) + half_layer_height + sidelen then
 					vm_data[vi] = c_bedrock
-				elseif (layer_height * current_layer) + half_layer_height - (sidelen * 5) <= y and y <= (layer_height * current_layer) + half_layer_height then
+				elseif (layer_height * current_layer) + half_layer_height - (sidelen * 2) <= y and y <= (layer_height * current_layer) + half_layer_height then
 					vm_data[vi] = c_skyrock
+					supress_shadow = true
 				elseif y <= height + (layer_height * current_layer) then
 --					if math.abs(cave_3dmap[nixyz]) < 10 then -- + (y / 400) then
 						vm_data[vi] = c_stone
@@ -244,10 +246,13 @@ minetest.register_on_generated(function(minp, maxp)
 		nixz = nixz + sidelen
 	end
 
-
 	vm:set_data(vm_data)
-	vm:set_lighting({day=settings.day_light, night=settings.night_light})
 	vm:update_liquids()
-	vm:calc_lighting(false)
-	vm:write_to_map()
+	if supress_shadow then
+		vm:calc_lighting(false)
+		vm:write_to_map(false)
+	else
+		vm:calc_lighting()
+		vm:write_to_map()
+	end
 end)
