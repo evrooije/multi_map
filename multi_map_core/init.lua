@@ -9,8 +9,8 @@ multi_map.map_max = 30927
 multi_map.half_layer_height = multi_map.layer_height / 2
 multi_map.current_layer = nil
 
-multi_map.bedrock = "multi_map:bedrock"
-multi_map.skyrock = "multi_map:skyrock"
+multi_map.bedrock = "multi_map_core:bedrock"
+multi_map.skyrock = "multi_map_core:skyrock"
 
 multi_map.generate_bedrock = true
 multi_map.generate_skyrock = true
@@ -36,15 +36,12 @@ function multi_map.append_generator(generator)
 	table.insert(multi_map.generators, generator)
 end
 
-function multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, content_id, light_data, light_level)
+function multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, content_id)
 	for z = minp.z, maxp.z do
 		for y = minp.y, maxp.y do
 			local vi = area:index(minp.x, y, z)
 			for x = minp.x, maxp.x do
 				vm_data[vi] = content_id
-				if light_data then
-					light_data[vi] = light_level
-				end
 				vi = vi + 1
 			end
 		end
@@ -59,6 +56,8 @@ multi_map.c_water = nil
 multi_map.c_bedrock = nil
 multi_map.c_skyrock = nil
 
+minetest.set_mapgen_params({mgname = "singlenode"})
+
 minetest.register_on_mapgen_init(function(mapgen_params)
 	if multi_map.number_of_layers * multi_map.layer_height > multi_map.map_height then
 		minetest.log("error", "Number of layers for the given layer height exceeds map height!")
@@ -66,14 +65,14 @@ minetest.register_on_mapgen_init(function(mapgen_params)
 end)
 
 minetest.register_on_generated(function(minp, maxp)
---	if firstrun then
+	if firstrun then
 		multi_map.c_stone = minetest.get_content_id("default:stone")
 		multi_map.c_air = minetest.get_content_id("air")
 		multi_map.c_water = minetest.get_content_id("default:water_source")
 		multi_map.c_bedrock = minetest.get_content_id(multi_map.bedrock)
 		multi_map.c_skyrock = minetest.get_content_id(multi_map.skyrock)
 		firstrun = false
---	end
+	end
 
 	multi_map.set_current_layer(minp.y)
 	local sidelen = maxp.x - minp.x + 1
@@ -97,38 +96,23 @@ minetest.register_on_generated(function(minp, maxp)
 				 multi_map.map_min + (multi_map.layer_height * (multi_map.current_layer + 1)) - 160 == minp.y
 			)
 	then
-		print("Generating skyrock at y = "..minp.y)
 		local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
 		local vm_data = vm:get_data()
 
 		multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.c_skyrock)
+		vm:set_lighting({day=15, night=0})
 		vm:set_data(vm_data)
 		vm:calc_lighting(false)
 		vm:write_to_map(false)
 	else
-		local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
-		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
-		local vm_data = vm:get_data()
-		local light_data = vm:get_light_data()
-		print(offset_minp.y)
-		if offset_minp.y >= 0 then
-			multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.c_air)
-			vm:set_lighting({day=15, night=0})
-		else
-			multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.c_stone, light_data, 0)
+		for i,f in ipairs(multi_map.generators) do
+			f(multi_map.current_layer, minp, maxp, offset_minp, offset_maxp)
 		end
-		vm:set_data(vm_data)
-		vm:calc_lighting()
-		vm:write_to_map()
-
---		for i,f in ipairs(multi_map.generators) do
---			f(multi_map.current_layer, minp, maxp, offset_minp, offset_maxp)
---		end
 	end
 end)
 
-minetest.register_node("multi_map:skyrock", {
+minetest.register_node("multi_map_core:skyrock", {
 	description = "Multi Map Impenetrable Skyblock",
 	drawtype = "airlike",
 	is_ground_content = false,
@@ -140,7 +124,7 @@ minetest.register_node("multi_map:skyrock", {
 	paramtype = "light",
 })
 
-minetest.register_node("multi_map:bedrock", {
+minetest.register_node("multi_map_core:bedrock", {
 	description = "Multi Map Impenetrable Bedrock",
 	drawtype = "normal",
 	tiles ={"multi_map_bedrock.png"},
