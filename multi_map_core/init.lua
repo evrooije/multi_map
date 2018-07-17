@@ -77,6 +77,10 @@ minetest.register_on_generated(function(minp, maxp)
 	multi_map.set_current_layer(minp.y)
 	local sidelen = maxp.x - minp.x + 1
 
+	if multi_map.current_layer >= multi_map.number_of_layers then
+		return
+	end
+
 	local offset_minp = { x = minp.x, y = multi_map.get_offset_y(minp.y), z = minp.z }
 	local offset_maxp = { x = maxp.x, y = multi_map.get_offset_y(maxp.y), z = maxp.z }
 
