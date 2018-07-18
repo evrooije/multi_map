@@ -33,18 +33,39 @@ function multi_map.get_offset_y(y)
 	return y - center_point
 end
 
-function multi_map.register_fallback_generator(generator)
-	multi_map.fallback_generator = generator
+function multi_map.register_fallback_generator(...)
+	local arg = {...}
+	local generator
+	local arguments
+
+	if arg[2] then
+		generator = arg[1]
+		arguments = arg[2]
+	else
+		generator = arg[1]
+	end
+	multi_map.fallback_generator = { generator = generator, arguments = arguments }
 end
 
 function multi_map.register_generator(...)
 	local arg = {...}
 	local position
 	local generator
+	local arguments
 
-	if arg[2] then
+	if arg[3] then
 		position = arg[1]
 		generator = arg[2]
+		arguments = arg[3]
+		print(arguments)
+	elseif arg[2] then
+		if type(arg[1]) == "function" then
+			generator = arg[1]
+			arguments = arg[2]
+		else
+			position = arg[1]
+			generator = arg[2]
+		end
 	else
 		generator = arg[1]
 	end
@@ -56,7 +77,7 @@ function multi_map.register_generator(...)
 				t = {}
 				multi_map.generators[i] = t
 			end
-			table.insert(t, generator)
+			table.insert(t, { generator = generator, arguments = arguments })
 		end
 	else
 		local t = multi_map.generators[position]
@@ -64,7 +85,7 @@ function multi_map.register_generator(...)
 			t = {}
 			multi_map.generators[position] = t
 		end
-		table.insert(t, generator)
+		table.insert(t, { generator = generator, arguments = arguments })
 	end
 end
 
@@ -83,6 +104,7 @@ end
 local firstrun = true
 -- Global helpers for mapgens
 multi_map.c_stone = nil
+multi_map.c_sandstone = nil
 multi_map.c_air = nil
 multi_map.c_water = nil
 multi_map.c_lava = nil
@@ -98,6 +120,7 @@ end)
 minetest.register_on_generated(function(minp, maxp)
 	if firstrun then
 		multi_map.c_stone = minetest.get_content_id("default:stone")
+		multi_map.c_sandstone = minetest.get_content_id("default:sandstone")
 		multi_map.c_air = minetest.get_content_id("air")
 		multi_map.c_water = minetest.get_content_id("default:water_source")
 		multi_map.c_lava = minetest.get_content_id("default:lava_source")
@@ -145,14 +168,14 @@ minetest.register_on_generated(function(minp, maxp)
 		local t = multi_map.generators[multi_map.current_layer]
 		if not t then
 			if multi_map.fallback_generator then
-				multi_map.fallback_generator(multi_map.current_layer, minp, maxp, offset_minp, offset_maxp)
+				multi_map.fallback_generator.generator(multi_map.current_layer, minp, maxp, offset_minp, offset_maxp, multi_map.fallback_generator.arguments)
 			else
 				minetest.log("error", "Generator for layer "..multi_map.current_layer.." missing and no fallback specified, exiting mapgen!")
 				return
 			end
 		else
 			for i,f in ipairs(t) do
-				f(multi_map.current_layer, minp, maxp, offset_minp, offset_maxp)
+				f.generator(multi_map.current_layer, minp, maxp, offset_minp, offset_maxp, f.arguments)
 			end
 		end
 	end
