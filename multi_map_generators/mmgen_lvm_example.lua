@@ -1,4 +1,6 @@
-function generate(current_layer, minp, maxp, offset_minp, offset_maxp)
+mmgen_lvm_example = {}
+
+function mmgen_lvm_example.generate(current_layer, minp, maxp, offset_minp, offset_maxp)
 	local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 	local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
 	local vm_data = vm:get_data()
@@ -12,5 +14,3 @@ function generate(current_layer, minp, maxp, offset_minp, offset_maxp)
 	vm:calc_lighting(false)
 	vm:write_to_map(false)
 end
-
-multi_map.append_generator(generate)
