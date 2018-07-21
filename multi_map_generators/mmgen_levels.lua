@@ -112,6 +112,7 @@ function mmgen_levels.generate(current_layer, minp, maxp, offset_minp, offset_ma
 	local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 	local area = VoxelArea:new{MinEdge=emin, MaxEdge=emax}
 	local data = vm:get_data()
+	local light_data = vm:get_light_data()
 	
 	local c_stone = minetest.get_content_id("default:stone")
 	local c_sand  = minetest.get_content_id("default:sand")
@@ -232,6 +233,14 @@ function mmgen_levels.generate(current_layer, minp, maxp, offset_minp, offset_ma
 					end
 				end
 
+--				if relative_y < 0 then
+--					if relative_y > -15 then
+--						light_data[vi] = 15 + relative_y
+--					else
+--						light_data[vi] = 0
+--					end
+--				end
+
 				ni3d = ni3d + 1
 				ni2d = ni2d + 1
 				vi = vi + 1
@@ -243,13 +252,12 @@ function mmgen_levels.generate(current_layer, minp, maxp, offset_minp, offset_ma
 	end
 
 	vm:set_data(data)
-	if oy0 < 0 then
-		vm:set_lighting({day=0, night=0})
-	else
-		vm:set_lighting({day=15, night=0})
-	end
+--	vm:set_light_data(light_data)
+--	if oy0 < 0 then
+--		vm:set_lighting({day=0, night=0})
+--	end
 	vm:calc_lighting()
-	vm:write_to_map(data)
+	vm:write_to_map()
 	vm:update_liquids()
 
 end
