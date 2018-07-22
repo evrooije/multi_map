@@ -9,7 +9,7 @@ function mmgen_simple.generate(current_layer, vm, area, vm_data, minp, maxp, off
 	end
 
 	if offset_minp.y >= 0 then
-		multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.c_air)
+		multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.node["air"])
 	else
 		multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, c_ground)
 	end
