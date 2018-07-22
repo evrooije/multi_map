@@ -92,6 +92,47 @@ function multi_map.register_fallback_generator(...)
 	multi_map.fallback_generator = { generator = generator, arguments = arguments }
 end
 
+multi_map.global_2d_maps = {}
+multi_map.global_2d_params = {}
+multi_map.global_2d_map_arrays = {}
+
+local last_used_layer = -1
+
+function multi_map.register_global_2dmap(name, params)
+	math.randomseed(params.seed)
+	multi_map.global_2d_params[name] = {}
+	multi_map.global_2d_map_arrays[name] = {}
+
+	for i = 0, multi_map.number_of_layers -1 do
+		local new_params = {
+			offset = params.offset,
+			scale = params.scale,
+			spread = {x=params.spread.x, y=params.spread.y, z=params.spread.z},
+			seed = math.random(-1000000000000, 1000000000000),
+			octaves = params.octaves,
+			persist = params.persist
+		}
+		multi_map.global_2d_params[name][i] = new_params
+	end
+end
+
+function multi_map.get_global_2dmap_flat(name, chulenxz, minposxz, current_layer)
+	if not current_layer then
+		if multi_map.current_layer ~= last_used_layer then
+			multi_map.global_2d_maps[name] = minetest.get_perlin_map(multi_map.global_2d_params[name][multi_map.current_layer], chulenxz)
+		end
+		return multi_map.global_2d_maps[name]:get2dMap_flat(minposxz, multi_map.global_2d_map_arrays[name][multi_map.current_layer])
+	else
+		if current_layer ~= last_used_layer then
+			multi_map.global_2d_maps[name] = minetest.get_perlin_map(multi_map.global_2d_params[name][current_layer], chulenxz)
+		end
+		return multi_map.global_2d_maps[name]:get2dMap_flat(minposxz, multi_map.global_2d_map_arrays[name][current_layer])
+	end
+end
+
+function multi_map.register_global_3dnoise()
+end
+
 -- Register a generator for all if position is left out or one layer if position is specified
 -- position = the optional layer for which call this generator
 -- generator = the function to call

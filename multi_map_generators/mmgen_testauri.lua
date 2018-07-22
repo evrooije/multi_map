@@ -3,61 +3,52 @@ local layers = {}
 
 mmgen_testauri.water_height = 0
 
-mmgen_testauri.seed = 835726
-
-math.randomseed(mmgen_testauri.seed)
-
-for i = 0, multi_map.number_of_layers -1 do
-	local height_map_seed = math.random(-1000000000000, 1000000000000)
-	local terrain_type_seed = math.random(-1000000000000, 1000000000000)
-	local mountain_peak_seed = math.random(-1000000000000, 1000000000000)
-
-	layers[i] = {
-		height_map_params = {
-			offset = 0,
-			scale = 50,
-			spread = {x=2048, y=2048, z=2048},
-			seed = height_map_seed,
-			octaves = 7,
-			persist = 0.7
-		},
-		terrain_type_params = {
-			offset = 2.5,
-			scale = 2.5,
-			spread = {x=1024, y=1024, z=1024},
-			seed = terrain_type_seed,
-			octaves = 6,
-			persist = 0.6
-		},
-		mountain_peak_params = {
-			offset = -75,
-			scale = 125,
-			spread = {x=256, y=256, z=256},
-			seed = mountain_peak_seed,
-			octaves = 7,
-			persist = 0.6
-		},
+multi_map.register_global_2dmap(
+	"height_map",
+	{
+		offset = 0,
+		scale = 50,
+		spread = {x=2048, y=2048, z=2048},
+		seed = 6897925,
+		octaves = 7,
+		persist = 0.7
 	}
-end
+)
+
+multi_map.register_global_2dmap(
+	"terrain_type",
+	{
+		offset = 2.5,
+		scale = 2.5,
+		spread = {x=1024, y=1024, z=1024},
+		seed = 9414432,
+		octaves = 6,
+		persist = 0.6
+	}
+)
+
+multi_map.register_global_2dmap(
+	"mountain_peak",
+	{
+		offset = -75,
+		scale = 125,
+		spread = {x=256, y=256, z=256},
+		seed = 21341535,
+		octaves = 7,
+		persist = 0.6
+	}
+)
 
 mmgen_testauri.cave_seed = 6568239
 mmgen_testauri.lake_seed = 6568239
-
-local last_layer
 
 -- Base terrain is the lower frequency, lower amplitude noise
 -- Terrain type is a multiplier that can dampen terrain to make
 -- flat plains, hills or mountains
 -- Mountain peak generates peaks when greater than zero, making
 -- jagged and rugged peaks on the surface or mountain tops
-local height_map
-local terrain_type_map
-local mountain_peak_map
 local lake_map
 
-local height_map_2dmap = {}
-local terrain_type_2dmap = {}
-local mountain_peak_2dmap = {}
 local lake_3dmap = {}
 
 local cave_map
@@ -114,18 +105,12 @@ function mmgen_testauri.generate(current_layer, vm, area, vm_data, minp, maxp, o
 	local ystridevm = sidelen + 32
 	local zstridevm = ystridevm ^ 2
 
-	if last_layer ~= current_layer then
-		height_map = minetest.get_perlin_map(layers[current_layer].height_map_params, chulenxz)
-		terrain_type_map = minetest.get_perlin_map(layers[current_layer].terrain_type_params, chulenxz)
-		mountain_peak_map = minetest.get_perlin_map(layers[current_layer].mountain_peak_params, chulenxz)
-	end
-
 	cave_map = cave_map or minetest.get_perlin_map(cave_params, chulenxyz)
 --	perlin_worm_start_map = perlin_worm_start_map or minetest.get_perlin_map(perlin_worm_start_params, chulenxyz)
 
-	height_map:get2dMap_flat(minposxz, height_map_2dmap)
-	terrain_type_map:get2dMap_flat(minposxz, terrain_type_2dmap)
-	mountain_peak_map:get2dMap_flat(minposxz, mountain_peak_2dmap)
+	local height_map_2dmap = multi_map.get_global_2dmap_flat("height_map", chulenxz, minposxz)
+	local terrain_type_2dmap = multi_map.get_global_2dmap_flat("terrain_type", chulenxz, minposxz)
+	local mountain_peak_2dmap = multi_map.get_global_2dmap_flat("mountain_peak", chulenxz, minposxz)
 
 	cave_map:get3dMap_flat(minposxyz, cave_3dmap)
 --	perlin_worm_start_map:get3dMap_flat(minposxyz, perlin_worm_start_3dmap)
