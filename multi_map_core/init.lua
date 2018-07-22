@@ -254,7 +254,6 @@ minetest.register_on_generated(function(minp, maxp)
 		-- Remove the temporary stone shadow casting layer again, if needed
 		if remove_shadow_caster then
 			if vm_data[area:index(minp.x, maxp.y + 1, minp.z)] == multi_map.node["multi_map_core:shadow_caster"] then
-
 				multi_map.generate_singlenode_plane(minp, maxp, area, vm_data, maxp.y + 1, multi_map.node["ignore"])
 				vm:set_data(vm_data)
 				vm:write_to_map()
