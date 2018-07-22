@@ -143,6 +143,17 @@ function multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, content_
 	end
 end
 
+-- Helper to create a 1 node high plane on the specified y
+function multi_map.generate_singlenode_plane(minp, maxp, area, vm_data, y, content_id)
+	for z = minp.z, maxp.z do
+		local vi = area:index(minp.x, y, z)
+		for x = minp.x, maxp.x do
+			vm_data[vi] = content_id
+			vi = vi + 1
+		end
+	end
+end
+
 local firstrun = true
 -- Global helpers for mapgens
 multi_map.c_ignore = nil
@@ -153,6 +164,7 @@ multi_map.c_water = nil
 multi_map.c_lava = nil
 multi_map.c_bedrock = nil
 multi_map.c_skyrock = nil
+multi_map.c_shadow_caster = nil
 
 minetest.register_on_mapgen_init(function(mapgen_params)
 	if multi_map.number_of_layers * multi_map.layer_height > multi_map.map_height then
@@ -171,6 +183,7 @@ minetest.register_on_generated(function(minp, maxp)
 		multi_map.c_lava = minetest.get_content_id("default:lava_source")
 		multi_map.c_bedrock = minetest.get_content_id(multi_map.bedrock)
 		multi_map.c_skyrock = minetest.get_content_id(multi_map.skyrock)
+		multi_map.c_shadow_caster = minetest.get_content_id("multi_map_core:shadow_caster")
 		firstrun = false
 	end
 
@@ -192,6 +205,7 @@ minetest.register_on_generated(function(minp, maxp)
 		local vm_data = vm:get_data()
 
 		multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.c_bedrock)
+
 		vm:set_data(vm_data)
 		vm:calc_lighting(false)
 		vm:write_to_map(false)
@@ -205,25 +219,55 @@ minetest.register_on_generated(function(minp, maxp)
 		local vm_data = vm:get_data()
 
 		multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.c_skyrock)
+
 		vm:set_lighting({day=15, night=0})
 		vm:set_data(vm_data)
 		vm:calc_lighting(false)
 		vm:write_to_map(false)
 	else
+		local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
+		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
+		local vm_data = vm:get_data()
+		local remove_shadow_caster = false
+
+		-- Add a temporary stone layer above the chunk to ensure caves are dark
+		if multi_map.get_absolute_centerpoint() >= maxp.y then
+			if vm_data[area:index(minp.x, maxp.y + 1, minp.z)] == multi_map.c_ignore then
+				remove_shadow_caster = true
+				multi_map.generate_singlenode_plane(minp, maxp, area, vm_data, maxp.y + 1, multi_map.c_shadow_caster)
+			end
+		end
+
 		local t = multi_map.generators[multi_map.current_layer]
 
 		if not t then
 			if multi_map.fallback_generator then
-				multi_map.fallback_generator.generator(multi_map.current_layer, minp, maxp, offset_minp, offset_maxp, multi_map.fallback_generator.arguments)
+				multi_map.fallback_generator.generator(multi_map.current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp, multi_map.fallback_generator.arguments)
 			else
 				minetest.log("error", "Generator for layer "..multi_map.current_layer.." missing and no fallback specified, exiting mapgen!")
 				return
 			end
 		else
 			for i,f in ipairs(t) do
-				f.generator(multi_map.current_layer, minp, maxp, offset_minp, offset_maxp, f.arguments)
+				f.generator(multi_map.current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp, f.arguments)
 			end
 		end
+
+		vm:set_data(vm_data)
+		vm:calc_lighting()
+		vm:write_to_map()
+		vm:update_liquids()
+
+		-- Remove the temporary stone shadow casting layer again, if needed
+		if remove_shadow_caster then
+			if vm_data[area:index(minp.x, maxp.y + 1, minp.z)] == multi_map.c_shadow_caster then
+
+				multi_map.generate_singlenode_plane(minp, maxp, area, vm_data, maxp.y + 1, multi_map.c_ignore)
+				vm:set_data(vm_data)
+				vm:write_to_map()
+			end
+		end
+
 	end
 end)
 
@@ -239,6 +283,17 @@ minetest.register_node("multi_map_core:skyrock", {
 	paramtype = "light",
 })
 
+minetest.register_node("multi_map_core:shadow_caster", {
+	description = "Multi Map Shadow Caster",
+	drawtype = "airlike",
+	is_ground_content = false,
+	sunlight_propagates = false,
+	walkable = false,
+	pointable = false,
+	diggable = false,
+	climbable = false,
+})
+
 minetest.register_node("multi_map_core:bedrock", {
 	description = "Multi Map Impenetrable Bedrock",
 	drawtype = "normal",
@@ -250,7 +305,7 @@ minetest.register_node("multi_map_core:bedrock", {
 	climbable = false,
 })
 
-
+--[[
 function multi_map.calc_lighting(emin, emax, minp, maxp, propagate_shadow, ground_level)
 	local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 	multi_map.propagate_sunlight(vm, emin, emax, propagate_shadow, ground_level)
@@ -312,7 +367,7 @@ function BitAND(a,b)--Bitwise and
 	end
 	return c
 end
-
+]]--
 
 --[[
 	VoxelArea a(nmin, nmax);

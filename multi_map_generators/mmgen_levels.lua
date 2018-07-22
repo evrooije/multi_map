@@ -99,7 +99,7 @@ local nobj_spike = nil
 
 -- On generated function
 
-function mmgen_levels.generate(current_layer, minp, maxp, offset_minp, offset_maxp)
+function mmgen_levels.generate(current_layer, vm, area, data, minp, maxp, offset_minp, offset_maxp)
 	local x1 = maxp.x
 	local y1 = maxp.y
 	local z1 = maxp.z
@@ -108,11 +108,6 @@ function mmgen_levels.generate(current_layer, minp, maxp, offset_minp, offset_ma
 	local z0 = minp.z
 	local oy1 = offset_maxp.y
 	local oy0 = offset_minp.y
-	
-	local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
-	local area = VoxelArea:new{MinEdge=emin, MaxEdge=emax}
-	local data = vm:get_data()
-	local light_data = vm:get_light_data()
 	
 	local c_stone = minetest.get_content_id("default:stone")
 	local c_sand  = minetest.get_content_id("default:sand")
@@ -233,14 +228,6 @@ function mmgen_levels.generate(current_layer, minp, maxp, offset_minp, offset_ma
 					end
 				end
 
---				if relative_y < 0 then
---					if relative_y > -15 then
---						light_data[vi] = 15 + relative_y
---					else
---						light_data[vi] = 0
---					end
---				end
-
 				ni3d = ni3d + 1
 				ni2d = ni2d + 1
 				vi = vi + 1
@@ -250,14 +237,5 @@ function mmgen_levels.generate(current_layer, minp, maxp, offset_minp, offset_ma
 		end
 		ni2d = ni2d + sidelen
 	end
-
-	vm:set_data(data)
---	vm:set_light_data(light_data)
---	if oy0 < 0 then
---		vm:set_lighting({day=0, night=0})
---	end
-	multi_map.calc_lighting(minp, maxp, minp, maxp, true)
-	vm:write_to_map()
-	vm:update_liquids()
 
 end
