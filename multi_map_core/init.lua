@@ -37,6 +37,14 @@ function multi_map.set_current_layer(y)
 	end
 end
 
+function multi_map.get_absolute_centerpoint(current_layer)
+	if current_layer then
+		return multi_map.map_min + (current_layer * multi_map.layer_height) + multi_map.half_layer_height
+	else
+		return multi_map.map_min + (multi_map.current_layer * multi_map.layer_height) + multi_map.half_layer_height
+	end
+end
+
 -- Get the offset y position, i.e. the y relative to the current layer's center point
 -- y = absolute y value to be translated to y relative to layer center point
 function multi_map.get_offset_y(y)
@@ -243,41 +251,70 @@ minetest.register_node("multi_map_core:bedrock", {
 })
 
 
-
-
---[[
-
-
-function multi_map.calc_lighting(emin, emax, pmin, pmax, propagate_shadow, ground_level)
+function multi_map.calc_lighting(emin, emax, minp, maxp, propagate_shadow, ground_level)
 	local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 	multi_map.propagate_sunlight(vm, emin, emax, propagate_shadow, ground_level)
-	spread_light(pmin, pmax)
-}
+--	spread_light(pmin, pmax)
+end
 
 
 function multi_map.propagate_sunlight(vm, emin, emax, propagate_shadow, ground_level)
 	local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
 	local vm_data = vm:get_data()
 	local light_data = vm:get_light_data()
+	local block_is_underground
 
-	-- const v3s16 &em = vm->m_area.getExtent();
+	if ground_level then
+		block_is_underground = ground_level >= emax.y
+	else
+		block_is_underground = multi_map.get_absolute_centerpoint() >= emax.y
+	end
 
-	for z = minp.z, maxp.z do
-		for x = minp.x, maxp.x do
+	for z = emin.z, emax.z do
+		for x = emin.x, emax.x do
 			local vi = area:index(x, emax.y + 1, z)
 			if vm_data[vi] == multi_map.c_ignore then
 				if block_is_underground then
 					goto continue
 				end
-			elseif (light_data[vi] & 15) ~= 15 and propagate_shadow then
+			elseif light_data[vi] and BitAND(light_data[vi], 15) ~= 15 and propagate_shadow then
 				goto continue
 			end
-			vi = vi + 1
+
+			vi = vi - area.ystride
+
+			for y = emax.y, emin.y, -1 do
+				local nodename = minetest.get_name_from_content_id(vm_data[vi])
+				if nodename ~= "ignore" then
+					if not minetest.registered_nodes[nodename].sunlight_propagates then
+						break
+					end
+				end
+				light_data[vi] = 15
+				vi = vi - area.ystride
+			end
+
 			::continue::
 		end
 	end
 
+	vm:set_light_data(light_data)
 
+end
+
+
+function BitAND(a,b)--Bitwise and
+	local p,c=1,0
+	while a>0 and b>0 do
+		local ra,rb=a%2,b%2
+		if ra+rb>1 then c=c+p end
+		a,b,p=(a-ra)/2,(b-rb)/2,p*2
+	end
+	return c
+end
+
+
+--[[
 	VoxelArea a(nmin, nmax);
 	bool block_is_underground = (water_level >= nmax.Y);
 	const v3s16 &em = vm->m_area.getExtent();

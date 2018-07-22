@@ -256,7 +256,7 @@ function mmgen_levels.generate(current_layer, minp, maxp, offset_minp, offset_ma
 --	if oy0 < 0 then
 --		vm:set_lighting({day=0, night=0})
 --	end
-	vm:calc_lighting()
+	multi_map.calc_lighting(minp, maxp, minp, maxp, true)
 	vm:write_to_map()
 	vm:update_liquids()
 
