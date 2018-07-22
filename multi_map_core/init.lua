@@ -1,5 +1,10 @@
 multi_map = {}
 
+-- Shorthand alias, can be used when no mods are installed called mm or creating global mm
+if not mm then
+	mm = multi_map
+end
+
 multi_map.number_of_layers = 24		-- How may layers to generate
 multi_map.layers_start_chunk = 0	-- Y level where to start generatint layers, in chunks
 multi_map.layer_height_chunks = 32	-- Height of each layer, in chunks
@@ -100,7 +105,6 @@ function multi_map.register_generator(...)
 		position = arg[1]
 		generator = arg[2]
 		arguments = arg[3]
-		print(arguments)
 	elseif arg[2] then
 		if type(arg[1]) == "function" then
 			generator = arg[1]
@@ -156,17 +160,17 @@ function multi_map.generate_singlenode_plane(minp, maxp, area, vm_data, y, conte
 	end
 end
 
-local firstrun = true
--- Global helpers for mapgens
-multi_map.c_ignore = nil
-multi_map.c_stone = nil
-multi_map.c_sandstone = nil
-multi_map.c_air = nil
-multi_map.c_water = nil
-multi_map.c_lava = nil
-multi_map.c_bedrock = nil
-multi_map.c_skyrock = nil
-multi_map.c_shadow_caster = nil
+-- Inspired by duane's underworlds, to fetch the result of get_content_id once and cache it
+multi_map.node = setmetatable({}, {
+	__index = function(t, k)
+		if not (t and k and type(t) == 'table') then
+			return
+		end
+
+		t[k] = minetest.get_content_id(k)
+		return t[k]
+	end
+})
 
 minetest.register_on_mapgen_init(function(mapgen_params)
 	if multi_map.number_of_layers * multi_map.layer_height > multi_map.map_height then
@@ -176,19 +180,6 @@ minetest.register_on_mapgen_init(function(mapgen_params)
 end)
 
 minetest.register_on_generated(function(minp, maxp)
-	if firstrun then
-		multi_map.c_ignore = minetest.get_content_id("ignore")
-		multi_map.c_stone = minetest.get_content_id("default:stone")
-		multi_map.c_sandstone = minetest.get_content_id("default:sandstone")
-		multi_map.c_air = minetest.get_content_id("air")
-		multi_map.c_water = minetest.get_content_id("default:water_source")
-		multi_map.c_lava = minetest.get_content_id("default:lava_source")
-		multi_map.c_bedrock = minetest.get_content_id(multi_map.bedrock)
-		multi_map.c_skyrock = minetest.get_content_id(multi_map.skyrock)
-		multi_map.c_shadow_caster = minetest.get_content_id("multi_map_core:shadow_caster")
-		firstrun = false
-	end
-
 	multi_map.set_current_layer(minp.y)
 	local sidelen = maxp.x - minp.x + 1
 
@@ -206,7 +197,7 @@ minetest.register_on_generated(function(minp, maxp)
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
 		local vm_data = vm:get_data()
 
-		multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.c_bedrock)
+		multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.node[multi_map.bedrock])
 
 		vm:set_data(vm_data)
 		vm:calc_lighting(false)
@@ -220,7 +211,7 @@ minetest.register_on_generated(function(minp, maxp)
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
 		local vm_data = vm:get_data()
 
-		multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.c_skyrock)
+		multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.node[multi_map.skyrock])
 
 		vm:set_lighting({day=15, night=0})
 		vm:set_data(vm_data)
@@ -234,9 +225,9 @@ minetest.register_on_generated(function(minp, maxp)
 
 		-- Add a temporary stone layer above the chunk to ensure caves are dark
 		if multi_map.get_absolute_centerpoint() >= maxp.y then
-			if vm_data[area:index(minp.x, maxp.y + 1, minp.z)] == multi_map.c_ignore then
+			if vm_data[area:index(minp.x, maxp.y + 1, minp.z)] == multi_map.node["ignore"] then
 				remove_shadow_caster = true
-				multi_map.generate_singlenode_plane(minp, maxp, area, vm_data, maxp.y + 1, multi_map.c_shadow_caster)
+				multi_map.generate_singlenode_plane(minp, maxp, area, vm_data, maxp.y + 1, multi_map.node["multi_map_core:shadow_caster"])
 			end
 		end
 
@@ -262,9 +253,9 @@ minetest.register_on_generated(function(minp, maxp)
 
 		-- Remove the temporary stone shadow casting layer again, if needed
 		if remove_shadow_caster then
-			if vm_data[area:index(minp.x, maxp.y + 1, minp.z)] == multi_map.c_shadow_caster then
+			if vm_data[area:index(minp.x, maxp.y + 1, minp.z)] == multi_map.node["multi_map_core:shadow_caster"] then
 
-				multi_map.generate_singlenode_plane(minp, maxp, area, vm_data, maxp.y + 1, multi_map.c_ignore)
+				multi_map.generate_singlenode_plane(minp, maxp, area, vm_data, maxp.y + 1, multi_map.node["ignore"])
 				vm:set_data(vm_data)
 				vm:write_to_map()
 			end
@@ -306,188 +297,3 @@ minetest.register_node("multi_map_core:bedrock", {
 	diggable = false,
 	climbable = false,
 })
-
---[[
-function multi_map.calc_lighting(emin, emax, minp, maxp, propagate_shadow, ground_level)
-	local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
-	multi_map.propagate_sunlight(vm, emin, emax, propagate_shadow, ground_level)
---	spread_light(pmin, pmax)
-end
-
-
-function multi_map.propagate_sunlight(vm, emin, emax, propagate_shadow, ground_level)
-	local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
-	local vm_data = vm:get_data()
-	local light_data = vm:get_light_data()
-	local block_is_underground
-
-	if ground_level then
-		block_is_underground = ground_level >= emax.y
-	else
-		block_is_underground = multi_map.get_absolute_centerpoint() >= emax.y
-	end
-
-	for z = emin.z, emax.z do
-		for x = emin.x, emax.x do
-			local vi = area:index(x, emax.y + 1, z)
-			if vm_data[vi] == multi_map.c_ignore then
-				if block_is_underground then
-					goto continue
-				end
-			elseif light_data[vi] and BitAND(light_data[vi], 15) ~= 15 and propagate_shadow then
-				goto continue
-			end
-
-			vi = vi - area.ystride
-
-			for y = emax.y, emin.y, -1 do
-				local nodename = minetest.get_name_from_content_id(vm_data[vi])
-				if nodename ~= "ignore" then
-					if not minetest.registered_nodes[nodename].sunlight_propagates then
-						break
-					end
-				end
-				light_data[vi] = 15
-				vi = vi - area.ystride
-			end
-
-			::continue::
-		end
-	end
-
-	vm:set_light_data(light_data)
-
-end
-
-
-function BitAND(a,b)--Bitwise and
-	local p,c=1,0
-	while a>0 and b>0 do
-		local ra,rb=a%2,b%2
-		if ra+rb>1 then c=c+p end
-		a,b,p=(a-ra)/2,(b-rb)/2,p*2
-	end
-	return c
-end
-]]--
-
---[[
-	VoxelArea a(nmin, nmax);
-	bool block_is_underground = (water_level >= nmax.Y);
-	const v3s16 &em = vm->m_area.getExtent();
-
-	// NOTE: Direct access to the low 4 bits of param1 is okay here because,
-	// by definition, sunlight will never be in the night lightbank.
-
-	for (int z = a.MinEdge.Z; z <= a.MaxEdge.Z; z++) {
-		for (int x = a.MinEdge.X; x <= a.MaxEdge.X; x++) {
-			// see if we can get a light value from the overtop
-			u32 i = vm->m_area.index(x, a.MaxEdge.Y + 1, z);
-			if (vm->m_data[i].getContent() == CONTENT_IGNORE) {
-				if (block_is_underground)
-					continue;
-			} else if ((vm->m_data[i].param1 & 0x0F) != LIGHT_SUN &&
-					propagate_shadow) {
-				continue;
-			}
-			VoxelArea::add_y(em, i, -1);
-
-			for (int y = a.MaxEdge.Y; y >= a.MinEdge.Y; y--) {
-				MapNode &n = vm->m_data[i];
-				if (!ndef->get(n).sunlight_propagates)
-					break;
-				n.param1 = LIGHT_SUN;
-				VoxelArea::add_y(em, i, -1);
-			}
-		}
-	}
-	//printf("propagateSunlight: %dms\n", t.stop());
-}
-
-void Mapgen::spreadLight(v3s16 nmin, v3s16 nmax)
-{
-	//TimeTaker t("spreadLight");
-	VoxelArea a(nmin, nmax);
-
-	for (int z = a.MinEdge.Z; z <= a.MaxEdge.Z; z++) {
-		for (int y = a.MinEdge.Y; y <= a.MaxEdge.Y; y++) {
-			u32 i = vm->m_area.index(a.MinEdge.X, y, z);
-			for (int x = a.MinEdge.X; x <= a.MaxEdge.X; x++, i++) {
-				MapNode &n = vm->m_data[i];
-				if (n.getContent() == CONTENT_IGNORE)
-					continue;
-
-				const ContentFeatures &cf = ndef->get(n);
-				if (!cf.light_propagates)
-					continue;
-
-				// TODO(hmmmmm): Abstract away direct param1 accesses with a
-				// wrapper, but something lighter than MapNode::get/setLight
-
-				u8 light_produced = cf.light_source;
-				if (light_produced)
-					n.param1 = light_produced | (light_produced << 4);
-
-				u8 light = n.param1;
-				if (light) {
-					lightSpread(a, v3s16(x,     y,     z + 1), light);
-					lightSpread(a, v3s16(x,     y + 1, z    ), light);
-					lightSpread(a, v3s16(x + 1, y,     z    ), light);
-					lightSpread(a, v3s16(x,     y,     z - 1), light);
-					lightSpread(a, v3s16(x,     y - 1, z    ), light);
-					lightSpread(a, v3s16(x - 1, y,     z    ), light);
-				}
-			}
-		}
-	}
-
-	//printf("spreadLight: %dms\n", t.stop());
-}
-
-
-
-function multi_map.light_spread(area, v3s16 p, u8 light)
-{
-	if (light <= 1 || !a.contains(p))
-		return;
-
-	u32 vi = vm->m_area.index(p);
-	MapNode &n = vm->m_data[vi];
-
-	// Decay light in each of the banks separately
-	u8 light_day = light & 0x0F;
-	if (light_day > 0)
-		light_day -= 0x01;
-
-	u8 light_night = light & 0xF0;
-	if (light_night > 0)
-		light_night -= 0x10;
-
-	// Bail out only if we have no more light from either bank to propogate, or
-	// we hit a solid block that light cannot pass through.
-	if ((light_day  <= (n.param1 & 0x0F) &&
-		light_night <= (n.param1 & 0xF0)) ||
-		!ndef->get(n).light_propagates)
-		return;
-
-	// Since this recursive function only terminates when there is no light from
-	// either bank left, we need to take the max of both banks into account for
-	// the case where spreading has stopped for one light bank but not the other.
-	light = MYMAX(light_day, n.param1 & 0x0F) |
-			MYMAX(light_night, n.param1 & 0xF0);
-
-	n.param1 = light;
-
-	lightSpread(a, p + v3s16(0, 0, 1), light);
-	lightSpread(a, p + v3s16(0, 1, 0), light);
-	lightSpread(a, p + v3s16(1, 0, 0), light);
-	lightSpread(a, p - v3s16(0, 0, 1), light);
-	lightSpread(a, p - v3s16(0, 1, 0), light);
-	lightSpread(a, p - v3s16(1, 0, 0), light);
-}
-
-
-
-
-
-]]--

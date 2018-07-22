@@ -152,9 +152,9 @@ function mmgen_testauri.generate(current_layer, vm, area, vm_data, minp, maxp, o
 				end
 
 				if oy <= height then
-					vm_data[vi] = multi_map.c_stone
+					vm_data[vi] = multi_map.node["default:stone"]
 				elseif oy <= mmgen_testauri.water_height then
-					vm_data[vi] = multi_map.c_water
+					vm_data[vi] = multi_map.node["default:water_source"]
 				end
 
 				-- Increment noise index.
