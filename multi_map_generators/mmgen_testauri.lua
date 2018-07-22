@@ -99,7 +99,7 @@ local perlin_worm_start_params = {
 	persist = 0.7
 }
 
-function mmgen_testauri.generate(current_layer, minp, maxp, offset_minp, offset_maxp)
+function mmgen_testauri.generate(current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp)
 	local sidelen = maxp.x - minp.x + 1
 	local blocklen = sidelen / 5
 	--3d
@@ -113,10 +113,6 @@ function mmgen_testauri.generate(current_layer, minp, maxp, offset_minp, offset_
 	-- strides for voxelmanip
 	local ystridevm = sidelen + 32
 	local zstridevm = ystridevm ^ 2
-
-	local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
-	local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
-	local vm_data = vm:get_data()
 
 	if last_layer ~= current_layer then
 		height_map = minetest.get_perlin_map(layers[current_layer].height_map_params, chulenxz)
@@ -176,8 +172,4 @@ function mmgen_testauri.generate(current_layer, minp, maxp, offset_minp, offset_
 		nixz = nixz + sidelen
 	end
 
-	vm:set_data(vm_data)
-	vm:update_liquids()
-	vm:calc_lighting()
-	vm:write_to_map()
 end

@@ -54,6 +54,8 @@ function multi_map.get_offset_y(y)
 		return math.abs(y) - math.abs(center_point)
 	elseif center_point < 0 and y < 0 then
 		return math.abs(center_point) - math.abs(y)
+	elseif center_point > 0 and y < 0 then
+		return math.abs(y) - math.abs(center_point)
 	else
 		return center_point - y
 	end
@@ -170,7 +172,7 @@ minetest.register_on_mapgen_init(function(mapgen_params)
 	if multi_map.number_of_layers * multi_map.layer_height > multi_map.map_height then
 		minetest.log("error", "Number of layers for the given layer height exceeds map height!")
 	end
-	minetest.set_mapgen_params({mgname="singlenode", flags="nolight"})
+	minetest.set_mapgen_params({mgname="singlenode"})
 end)
 
 minetest.register_on_generated(function(minp, maxp)
