@@ -6,11 +6,12 @@ if not mm then
 end
 
 multi_map.number_of_layers = 24		-- How may layers to generate
-multi_map.layers_start_chunk = 0	-- Y level where to start generatint layers, in chunks
+multi_map.layers_start_chunk = 0	-- Y level where to start generating layers, in chunks
 multi_map.layer_height_chunks = 32	-- Height of each layer, in chunks
 
 -- Either engine defaults or derived from above values
 multi_map.layer_height = multi_map.layer_height_chunks * 80
+multi_map.layers_start = multi_map.layers_start_chunk * 80
 multi_map.map_height = 61840
 multi_map.map_min = -30912
 multi_map.map_max = 30927
@@ -34,8 +35,8 @@ multi_map.fallback_generator = nil
 -- y = absolute y value to be translated to layer
 function multi_map.set_current_layer(y)
 	for l = 0, multi_map.number_of_layers do
-		if y >= multi_map.map_min + (l * multi_map.layer_height)
-		   and y < multi_map.map_min + ((l + 1) * multi_map.layer_height)
+		if y >= multi_map.map_min + multi_map.layers_start + (l * multi_map.layer_height)
+		   and y < multi_map.map_min + multi_map.layers_start + ((l + 1) * multi_map.layer_height)
 		then
 			multi_map.current_layer = l
 		end
@@ -44,16 +45,16 @@ end
 
 function multi_map.get_absolute_centerpoint(current_layer)
 	if current_layer then
-		return multi_map.map_min + (current_layer * multi_map.layer_height) + multi_map.half_layer_height
+		return multi_map.map_min + multi_map.layers_start + (current_layer * multi_map.layer_height) + multi_map.half_layer_height
 	else
-		return multi_map.map_min + (multi_map.current_layer * multi_map.layer_height) + multi_map.half_layer_height
+		return multi_map.map_min + multi_map.layers_start + (multi_map.current_layer * multi_map.layer_height) + multi_map.half_layer_height
 	end
 end
 
 -- Get the offset y position, i.e. the y relative to the current layer's center point
 -- y = absolute y value to be translated to y relative to layer center point
 function multi_map.get_offset_y(y)
-	local center_point = multi_map.map_min + (multi_map.current_layer * multi_map.layer_height) + multi_map.half_layer_height
+	local center_point = multi_map.map_min + multi_map.layers_start + (multi_map.current_layer * multi_map.layer_height) + multi_map.half_layer_height
 
 	if center_point > 0 and y > 0 then
 		return math.abs(y) - math.abs(center_point)
@@ -70,7 +71,7 @@ end
 -- layer = the layer we are in
 -- y = relative y value to be translated to absolute world y position
 function multi_map.get_absolute_y(layer, y)
-	local center_point = multi_map.map_min + (multi_map.current_layer * multi_map.layer_height) + multi_map.half_layer_height
+	local center_point = multi_map.map_min + multi_map.layers_start + (multi_map.current_layer * multi_map.layer_height) + multi_map.half_layer_height
 	return y - center_point
 end
 
@@ -173,7 +174,7 @@ multi_map.node = setmetatable({}, {
 })
 
 minetest.register_on_mapgen_init(function(mapgen_params)
-	if multi_map.number_of_layers * multi_map.layer_height > multi_map.map_height then
+	if multi_map.layers_start + (multi_map.number_of_layers * multi_map.layer_height) > multi_map.map_height then
 		minetest.log("error", "Number of layers for the given layer height exceeds map height!")
 	end
 	minetest.set_mapgen_params({mgname="singlenode"})
@@ -191,7 +192,7 @@ minetest.register_on_generated(function(minp, maxp)
 	local offset_maxp = { x = maxp.x, y = multi_map.get_offset_y(maxp.y), z = maxp.z }
 
 	if  multi_map.generate_bedrock and
-		multi_map.map_min + (multi_map.layer_height * multi_map.current_layer) == minp.y
+		multi_map.map_min + multi_map.layers_start + (multi_map.layer_height * multi_map.current_layer) == minp.y
 	then
 		local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
@@ -203,8 +204,8 @@ minetest.register_on_generated(function(minp, maxp)
 		vm:calc_lighting(false)
 		vm:write_to_map(false)
 	elseif	multi_map.generate_skyrock
-			and (multi_map.map_min + (multi_map.layer_height * (multi_map.current_layer + 1)) - 80 == minp.y or
-				 multi_map.map_min + (multi_map.layer_height * (multi_map.current_layer + 1)) - 160 == minp.y
+			and (multi_map.map_min + multi_map.layers_start + (multi_map.layer_height * (multi_map.current_layer + 1)) - 80 == minp.y or
+				 multi_map.map_min + multi_map.layers_start + (multi_map.layer_height * (multi_map.current_layer + 1)) - 160 == minp.y
 			)
 	then
 		local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
