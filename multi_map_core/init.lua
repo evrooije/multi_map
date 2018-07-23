@@ -92,11 +92,13 @@ function multi_map.register_fallback_generator(...)
 	multi_map.fallback_generator = { generator = generator, arguments = arguments }
 end
 
+local last_used_layer = -1
+
 multi_map.global_2d_maps = {}
 multi_map.global_2d_params = {}
 multi_map.global_2d_map_arrays = {}
 
-local last_used_layer = -1
+local map_cache = {}
 
 function multi_map.register_global_2dmap(name, params)
 	math.randomseed(params.seed)
@@ -117,20 +119,50 @@ function multi_map.register_global_2dmap(name, params)
 end
 
 function multi_map.get_global_2dmap_flat(name, chulenxz, minposxz, current_layer)
-	if not current_layer then
-		if multi_map.current_layer ~= last_used_layer then
-			multi_map.global_2d_maps[name] = minetest.get_perlin_map(multi_map.global_2d_params[name][multi_map.current_layer], chulenxz)
-		end
-		return multi_map.global_2d_maps[name]:get2dMap_flat(minposxz, multi_map.global_2d_map_arrays[name][multi_map.current_layer])
-	else
-		if current_layer ~= last_used_layer then
-			multi_map.global_2d_maps[name] = minetest.get_perlin_map(multi_map.global_2d_params[name][current_layer], chulenxz)
-		end
-		return multi_map.global_2d_maps[name]:get2dMap_flat(minposxz, multi_map.global_2d_map_arrays[name][current_layer])
+	if not multi_map.global_2d_map_arrays[name] then
+		minetest.log("error", "[multi_map] Trying to get an unregistered global 2D map")
 	end
+
+	if not map_cache[name] then
+		if not current_layer then
+			if multi_map.current_layer ~= last_used_layer then
+				multi_map.global_2d_maps[name] = minetest.get_perlin_map(multi_map.global_2d_params[name][multi_map.current_layer], chulenxz)
+			end
+			map_cache[name] = multi_map.global_2d_maps[name]:get2dMap_flat(minposxz, multi_map.global_2d_map_arrays[name][multi_map.current_layer])
+			return map_cache[name]
+		else
+			if current_layer ~= last_used_layer then
+				multi_map.global_2d_maps[name] = minetest.get_perlin_map(multi_map.global_2d_params[name][current_layer], chulenxz)
+			end
+			map_cache[name] = multi_map.global_2d_maps[name]:get2dMap_flat(minposxz, multi_map.global_2d_map_arrays[name][current_layer])
+		end
+	end
+
+	return map_cache[name]
 end
 
-function multi_map.register_global_3dnoise()
+multi_map.global_3d_maps = {}
+multi_map.global_3d_params = {}
+multi_map.global_3d_map_arrays = {}
+
+function multi_map.register_global_3dmap(name, params)
+	multi_map.global_3d_params[name] = params
+	multi_map.global_3d_map_arrays[name] = {}
+end
+
+function multi_map.get_global_3dmap_flat(name, chulenxyz, minposxyz)
+	if not multi_map.global_3d_map_arrays[name] then
+		minetest.log("error", "[multi_map] Trying to get an unregistered global 3D map")
+	end
+
+	if not map_cache[name] then
+		if not multi_map.global_3d_maps[name] then
+			multi_map.global_3d_maps[name] = minetest.get_perlin_map(multi_map.global_3d_params[name], chulenxyz)
+		end
+		map_cache[name] = multi_map.global_3d_maps[name]:get3dMap_flat(minposxyz, multi_map.global_3d_map_arrays[name])
+	end
+
+	return map_cache[name]
 end
 
 -- Register a generator for all if position is left out or one layer if position is specified
@@ -216,12 +248,51 @@ multi_map.node = setmetatable({}, {
 
 minetest.register_on_mapgen_init(function(mapgen_params)
 	if multi_map.layers_start + (multi_map.number_of_layers * multi_map.layer_height) > multi_map.map_height then
-		minetest.log("error", "Number of layers for the given layer height exceeds map height!")
+		minetest.log("error", "[multi_map] Number of layers for the given layer height exceeds map height!")
 	end
 	minetest.set_mapgen_params({mgname="singlenode"})
 end)
 
+function multi_map.log_state()
+	minetest.log("action", "[multi_map] Multiple map layer generator global settings")
+	minetest.log("action", "[multi_map]  - Number of layers: "..multi_map.number_of_layers)
+	minetest.log("action", "[multi_map]  - Layers start at: "..(multi_map.map_min + multi_map.layers_start))
+	minetest.log("action", "[multi_map]  - Layer height: "..multi_map.layer_height)
+
+	minetest.log("action", "[multi_map]")
+	minetest.log("action", "[multi_map] Registered generators")
+	if multi_map.fallback_generator then
+		minetest.log("action", "[multi_map]  - "..debug.getinfo(multi_map.fallback_generator.generator).short_src:match("^.+/(.+)$").." (fallback)")
+	end
+	for k,v in pairs(multi_map.generators) do
+		for l,b in pairs(multi_map.generators[k]) do
+			minetest.log("action", "[multi_map]  - "..debug.getinfo(b.generator).short_src:match("^.+/(.+)$").." (layer "..k..")")
+		end
+	end
+
+	minetest.log("action", "[multi_map]")
+	minetest.log("action", "[multi_map] Registered global maps")
+	for k,v in pairs(multi_map.global_2d_params) do
+		minetest.log("action", "[multi_map]  - "..k.." (2D)")
+	end
+	for k,v in pairs(multi_map.global_3d_params) do
+		minetest.log("action", "[multi_map]  - "..k.." (3D)")
+	end
+
+	minetest.log("action", "[multi_map]")
+end
+
+local firstrun = true
+
 minetest.register_on_generated(function(minp, maxp)
+	if firstrun then
+		minetest.log("action", "[multi_map]")
+		minetest.log("action", "[multi_map] First on_generated call started, module state:")
+		minetest.log("action", "[multi_map]")
+		multi_map.log_state()
+		firstrun = false
+	end
+
 	multi_map.set_current_layer(minp.y)
 	local sidelen = maxp.x - minp.x + 1
 
@@ -279,7 +350,7 @@ minetest.register_on_generated(function(minp, maxp)
 			if multi_map.fallback_generator then
 				multi_map.fallback_generator.generator(multi_map.current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp, multi_map.fallback_generator.arguments)
 			else
-				minetest.log("error", "Generator for layer "..multi_map.current_layer.." missing and no fallback specified, exiting mapgen!")
+				minetest.log("error", "[multi_map] Generator for layer "..multi_map.current_layer.." missing and no fallback specified, exiting mapgen!")
 				return
 			end
 		else
@@ -303,6 +374,8 @@ minetest.register_on_generated(function(minp, maxp)
 		end
 
 	end
+
+	map_cache = {}
 end)
 
 minetest.register_node("multi_map_core:skyrock", {
