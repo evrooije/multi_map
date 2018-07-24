@@ -27,7 +27,7 @@ minetest.register_on_leaveplayer(function(player)
 end)
 
 function multi_map.update_hud(player)
-	if not multi_map.hud.enabled then
+	if not multi_map.hud.enabled or not multi_map.initialized() then
 		return
 	end
 
@@ -38,7 +38,7 @@ function multi_map.update_hud(player)
 
 	local hud_text = ""
 
-	if multi_map.hud.display_layer or multi_map.hud.display_layer_name then
+	if layer and (multi_map.hud.display_layer or multi_map.hud.display_layer_name) then
 		hud_text = hud_text..multi_map.hud.layer_label
 
 		if multi_map.hud.display_layer then

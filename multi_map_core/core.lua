@@ -4,13 +4,14 @@ multi_map.layers_start_chunk = 0	-- Y level where to start generating layers, in
 multi_map.layer_height_chunks = 32	-- Height of each layer, in chunks
 
 -- Either MT engine defaults or derived from above values, to be used for more readable calculations
-multi_map.layer_height = multi_map.layer_height_chunks * 80
-multi_map.layers_start = multi_map.layers_start_chunk * 80
+multi_map.layer_height = nil
+multi_map.half_layer_height = nil
+multi_map.layers_start = nil
+multi_map.current_layer = nil
+
 multi_map.map_height = 61840
 multi_map.map_min = -30912
 multi_map.map_max = 30927
-multi_map.half_layer_height = multi_map.layer_height / 2
-multi_map.current_layer = nil
 
 -- Can be overridden with someone's own values
 multi_map.bedrock = "multi_map_core:bedrock"  -- Node to use to fill the bottom of a layer
@@ -82,6 +83,10 @@ function multi_map.get_offset_y(y, current_layer)
 		l = current_layer
 	else
 		l = multi_map.current_layer
+	end
+
+	if not l then
+		return y
 	end
 
 	local center_point = multi_map.map_min + multi_map.layers_start + (l * multi_map.layer_height) + multi_map.half_layer_height
@@ -301,7 +306,7 @@ end
 function multi_map.get_layer_name(layer)
 	if multi_map.layer_names[layer] then
 		return multi_map.layer_names[layer]
-	elseif not multi_map.generators[layer] then
+	elseif multi_map.fallback_generator then
 		return multi_map.fallback_generator.name
 	end
 end
@@ -356,17 +361,26 @@ multi_map.node = setmetatable({}, {
 
 -- Simple init, does a sanity check of the settings and sets the mapgen to singlenode
 minetest.register_on_mapgen_init(function(mapgen_params)
-	if multi_map.layers_start + (multi_map.number_of_layers * multi_map.layer_height) > multi_map.map_height then
-		minetest.log("error", "[multi_map] Number of layers for the given layer height exceeds map height!")
-	end
 	minetest.set_mapgen_params({mgname="singlenode"})
 end)
 
 local firstrun = true
 
+function multi_map.initialized()
+	return not firstrun
+end
+
 -- Here all the magic (or should I say mess...) happens!
 minetest.register_on_generated(function(minp, maxp)
 	if firstrun then
+		multi_map.layer_height = multi_map.layer_height_chunks * 80
+		multi_map.layers_start = multi_map.layers_start_chunk * 80
+		multi_map.half_layer_height = multi_map.layer_height / 2
+
+		if multi_map.layers_start + (multi_map.number_of_layers * multi_map.layer_height) > multi_map.map_height then
+			minetest.log("error", "[multi_map] Number of layers for the given layer height exceeds map height!")
+		end
+
 		minetest.log("action", "[multi_map]")
 		minetest.log("action", "[multi_map] First on_generated call started, module state:")
 		minetest.log("action", "[multi_map]")
@@ -377,7 +391,7 @@ minetest.register_on_generated(function(minp, maxp)
 	multi_map.set_current_layer(minp.y)
 	local sidelen = maxp.x - minp.x + 1
 
-	if multi_map.current_layer >= multi_map.number_of_layers then
+	if not multi_map.current_layer or multi_map.current_layer >= multi_map.number_of_layers then
 		return
 	end
 

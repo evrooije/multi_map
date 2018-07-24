@@ -5,6 +5,7 @@ function multi_map.log_state()
 	minetest.log("action", "[multi_map]  - Number of layers: "..multi_map.number_of_layers)
 	minetest.log("action", "[multi_map]  - Layers start at: "..(multi_map.map_min + multi_map.layers_start))
 	minetest.log("action", "[multi_map]  - Layer height: "..multi_map.layer_height)
+	minetest.log("action", "[multi_map]  - HUD enabled: "..tostring(multi_map.hud.enabled))
 
 	minetest.log("action", "[multi_map]")
 	minetest.log("action", "[multi_map] Registered generators")
