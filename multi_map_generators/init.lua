@@ -20,3 +20,4 @@ multi_map.layer_height_chunks = 20
 multi_map.register_fallback_generator("Default Levels", mmgen_levels.generate)
 multi_map.register_generator(19, mmgen_levels.generate)
 multi_map.set_layer_name(19, "Central Layer")
+multi_map.set_layer_name(20, "Remote Levels Land")
