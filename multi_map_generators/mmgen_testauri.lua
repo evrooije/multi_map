@@ -93,6 +93,7 @@ local perlin_worm_start_params = {
 function mmgen_testauri.generate(current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp)
 	local sidelen = maxp.x - minp.x + 1
 	local blocklen = sidelen / 5
+	
 	--3d
 	local chulenxyz = {x = sidelen, y = sidelen, z = sidelen}
 	--2d

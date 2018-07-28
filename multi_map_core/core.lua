@@ -2,6 +2,7 @@
 multi_map.number_of_layers = 24		-- How may layers to generate
 multi_map.layers_start_chunk = 0	-- Y level where to start generating layers, in chunks
 multi_map.layer_height_chunks = 32	-- Height of each layer, in chunks
+multi_map.wrap_layers = false
 
 -- Either MT engine defaults or derived from above values, to be used for more readable calculations
 multi_map.layer_height = nil
@@ -17,9 +18,14 @@ multi_map.map_max = 30927
 multi_map.bedrock = "multi_map_core:bedrock"  -- Node to use to fill the bottom of a layer
 multi_map.skyrock = "multi_map_core:skyrock"  -- Node to use to fill the top of a layer
 
--- Whether to generate a bedrock layer under a layer/ skyrock above a layer
+-- Whether to generate a bedrock layer under a layer/ skyrock above a layer/ shadow caster
+-- above undeground mapchunks
 multi_map.generate_bedrock = true
 multi_map.generate_skyrock = true
+multi_map.generate_shadow_caster = true
+
+multi_map.override_bedrock_generator = nil
+multi_map.override_skyrock_generator = nil
 
 -- Table with generator chains
 multi_map.generators = {}
@@ -148,7 +154,9 @@ function multi_map.register_global_2dmap(name, params)
 			spread = {x=params.spread.x, y=params.spread.y, z=params.spread.z},
 			seed = math.random(-1000000000000, 1000000000000),
 			octaves = params.octaves,
-			persist = params.persist
+			persist = params.persist,
+			lacunarity = params.lacunarity,
+			flags = params.flags,
 		}
 		multi_map.global_2d_params[name][i] = new_params
 	end
@@ -159,23 +167,30 @@ end
 -- chulenxz = chunk length in 2 dimensions (xz)
 -- minposxz = minimum 2D position (xz)
 -- current layer = the layer for which to retrieve the map or nil to use multi_map's current layer
-function multi_map.get_global_2dmap_flat(name, chulenxz, minposxz, current_layer)
+function multi_map.get_global_2dmap_flat(name, chulenxz, minposxz, layer)
 	if not multi_map.global_2d_map_arrays[name] then
 		minetest.log("error", "[multi_map] Trying to get an unregistered global 2D map")
 	end
 
+	if multi_map.wrap_layers then
+		if layer then
+			map_cache[name] = multi_map.get_mixed_2dnoise_flat(name, chulenxz, minposxz, layer)
+		else
+			map_cache[name] = multi_map.get_mixed_2dnoise_flat(name, chulenxz, minposxz, multi_map.current_layer)
+		end
+	end
+
 	if not map_cache[name] then
-		if not current_layer then
+		if not layer then
 			if multi_map.current_layer ~= last_used_layer then
 				multi_map.global_2d_maps[name] = minetest.get_perlin_map(multi_map.global_2d_params[name][multi_map.current_layer], chulenxz)
 			end
 			map_cache[name] = multi_map.global_2d_maps[name]:get2dMap_flat(minposxz, multi_map.global_2d_map_arrays[name][multi_map.current_layer])
-			return map_cache[name]
 		else
-			if current_layer ~= last_used_layer then
-				multi_map.global_2d_maps[name] = minetest.get_perlin_map(multi_map.global_2d_params[name][current_layer], chulenxz)
+			if layer ~= last_used_layer then
+				multi_map.global_2d_maps[name] = minetest.get_perlin_map(multi_map.global_2d_params[name][layer], chulenxz)
 			end
-			map_cache[name] = multi_map.global_2d_maps[name]:get2dMap_flat(minposxz, multi_map.global_2d_map_arrays[name][current_layer])
+			map_cache[name] = multi_map.global_2d_maps[name]:get2dMap_flat(minposxz, multi_map.global_2d_map_arrays[name][layer])
 		end
 	end
 
@@ -405,11 +420,18 @@ minetest.register_on_generated(function(minp, maxp)
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
 		local vm_data = vm:get_data()
 
-		multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.node[multi_map.bedrock])
+		local skip = false
+		if multi_map.override_bedrock_generator then
+			skip = multi_map.override_bedrock_generator(multi_map.current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp)
+		end
 
-		vm:set_data(vm_data)
-		vm:calc_lighting(false)
-		vm:write_to_map(false)
+		if not skip then
+			multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.node[multi_map.bedrock])
+
+			vm:set_data(vm_data)
+			vm:calc_lighting(false)
+			vm:write_to_map(false)
+		end
 	elseif	multi_map.generate_skyrock
 			and (multi_map.map_min + multi_map.layers_start + (multi_map.layer_height * (multi_map.current_layer + 1)) - 80 == minp.y or
 				 multi_map.map_min + multi_map.layers_start + (multi_map.layer_height * (multi_map.current_layer + 1)) - 160 == minp.y
@@ -419,12 +441,19 @@ minetest.register_on_generated(function(minp, maxp)
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
 		local vm_data = vm:get_data()
 
-		multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.node[multi_map.skyrock])
+		local skip = false
+		if multi_map.override_skyrock_generator then
+			skip = multi_map.override_skyrock_generator(multi_map.current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp)
+		end
 
-		vm:set_lighting({day=15, night=0})
-		vm:set_data(vm_data)
-		vm:calc_lighting(false)
-		vm:write_to_map(false)
+		if not skip then
+			multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.node[multi_map.skyrock])
+
+			vm:set_lighting({day=15, night=0})
+			vm:set_data(vm_data)
+			vm:calc_lighting(false)
+			vm:write_to_map(false)
+		end
 	else
 		local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
@@ -432,7 +461,7 @@ minetest.register_on_generated(function(minp, maxp)
 		local remove_shadow_caster = false
 
 		-- Add a temporary stone layer above the chunk to ensure caves are dark
-		if multi_map.get_absolute_centerpoint() >= maxp.y then
+		if multi_map.generate_shadow_caster and multi_map.get_absolute_centerpoint() >= maxp.y then
 			if vm_data[area:index(minp.x, maxp.y + 1, minp.z)] == multi_map.node["ignore"] then
 				remove_shadow_caster = true
 				multi_map.generate_singlenode_plane(minp, maxp, area, vm_data, maxp.y + 1, multi_map.node["multi_map_core:shadow_caster"])
