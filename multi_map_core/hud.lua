@@ -27,7 +27,7 @@ minetest.register_on_leaveplayer(function(player)
 end)
 
 function multi_map.update_hud(player)
-	if not multi_map.hud.enabled or not multi_map.initialized() then
+	if not multi_map.hud.enabled then
 		return
 	end
 

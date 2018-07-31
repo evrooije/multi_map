@@ -52,13 +52,13 @@ end
 
 function multi_map.get_which_world_edge(pos)
 
-	if pos.x < -30912 + 160 then
+	if pos.x < -30912 + 240 then
 		return multi_map.world_edge.NEGATIVE_X
-	elseif pos.x > 30927 - 160 then
+	elseif pos.x > 30927 - 240 then
 		return multi_map.world_edge.POSITIVE_X
-	elseif pos.y < -30912 + 160 then
+	elseif pos.y < -30912 + 240 then
 		return multi_map.world_edge.NEGATIVE_Z
-	elseif pos.y > 30927 - 160 then
+	elseif pos.y > 30927 - 240 then
 		return multi_map.world_edge.POSITIVE_Z
 	else
 		return nil
@@ -67,33 +67,41 @@ function multi_map.get_which_world_edge(pos)
 end
 
 function multi_map.in_mixing_area(pos)
-	if  pos.x < -30912 + 160 or pos.x > 30927 - 160 or
-		pos.y < -30912 + 160 or pos.y > 30927 - 160 then
+	if  pos.x > 30927 - 240 or pos.y > 30927 - 240 then
 		return true
 	else
 		return false
 	end
 end
 
-function multi_map.in_mirrored_area(pos)
-	if  pos.x < -30912 + 80 or pos.x > 30927 - 80 or
-		pos.y < -30912 + 80 or pos.y > 30927 - 80 then
+function multi_map.in_mirrored_area_1(pos)
+	if  pos.x > 30927 - 160 or pos.y > 30927 - 160 then
 		return true
 	else
 		return false
 	end
 end
 
--- Current
--- 160      80
--- [     ]  [     ]
--- [  L  ]  [  M  ]
--- [     ]  [     ]
--- Opposite
--- 0        80
--- [     ]  [     ]
--- [  L  ]  [  M  ]
--- [     ]  [     ]
+function multi_map.in_mirrored_area_2(pos)
+	if  pos.x > 30927 - 80 or pos.y > 30927 - 80 then
+		return true
+	else
+		return false
+	end
+end
+
+function multi_map.in_skip_area(pos)
+	if  pos.x < -30912 + 80 or pos.y < -30912 + 80 then
+		return true
+	else
+		return false
+	end
+end
+
+-- Normal area         Mixed area                           Mirrored area                                                           Teleport area
+-- layer 1a (-320) --> layer mixed 1b (-240) and 2a (0) --> layer 1 supressed (-160) layer 2b mirrored (80) --> teleport --> layer 1 supressed (-80) layer 2c mirrored (160)
+-- Normal area          Normal area                           Normal area
+-- layer 2a (0) air --> layer 2b (80) --> teleport --> layer 2c (160)
 function multi_map.get_mixed_2dnoise_flat(name, chulenxz, minposxz, layer)
 	local edge = multi_map.get_which_world_edge(minposxz)
 	
@@ -109,56 +117,57 @@ function multi_map.get_mixed_2dnoise_flat(name, chulenxz, minposxz, layer)
 
 	local opposite_minposxz = { x = minposxz.x, y = minposxz.y }
 
-	if multi_map.in_mirrored_area(minposxz) then
-		if multi_map.world_edge.NEGATIVE_X == edge then
-			opposite_minposxz.x = 30927 - 160
-		elseif multi_map.world_edge.POSITIVE_X == edge then
+	if multi_map.in_mirrored_area_2(minposxz) then
+		if multi_map.world_edge.POSITIVE_X == edge then
 			opposite_minposxz.x = -30912 + 160
-		elseif multi_map.world_edge.NEGATIVE_Z == edge then
-			opposite_minposxz.y = 30927 - 160
 		elseif multi_map.world_edge.POSITIVE_Z == edge then
 			opposite_minposxz.y = -30912 + 160
 		end
-		
-		local noise1 = minetest.get_perlin_map(multi_map.global_2d_params[name][layer], chulenxz)
+
 		local noise2 = minetest.get_perlin_map(multi_map.global_2d_params[name][target_layer], chulenxz)
-		local map1 = noise1:get2dMap_flat(minposxz)
 		local map2 = noise2:get2dMap_flat(opposite_minposxz)
 
-		if multi_map.world_edge.NEGATIVE_X == edge then
-			return multi_map.mix_noise_map_x(map1, map2, opposite_minposxz)
-		elseif multi_map.world_edge.POSITIVE_X == edge then
-			return multi_map.mix_noise_map_x(map2, map1, opposite_minposxz)
-		elseif multi_map.world_edge.NEGATIVE_Z == edge then
-			return multi_map.mix_noise_map_z(map1, map2, opposite_minposxz)
-		elseif multi_map.world_edge.POSITIVE_Z == edge then
-			return multi_map.mix_noise_map_x(map2, map1, opposite_minposxz)
-		end
+		return map2
 
-	elseif multi_map.in_mixing_area(minposxz) then
-		if multi_map.world_edge.NEGATIVE_X == edge then
-			opposite_minposxz.x = 30927 - 80
-		elseif multi_map.world_edge.POSITIVE_X == edge then
+	elseif multi_map.in_mirrored_area_1(minposxz) then
+		if multi_map.world_edge.POSITIVE_X == edge then
 			opposite_minposxz.x = -30912 + 80
-		elseif multi_map.world_edge.NEGATIVE_Z == edge then
-			opposite_minposxz.y = 30927 - 80
 		elseif multi_map.world_edge.POSITIVE_Z == edge then
 			opposite_minposxz.y = -30912 + 80
 		end
-
-		local noise1 = minetest.get_perlin_map(multi_map.global_2d_params[name][layer], chulenxz)
+		
 		local noise2 = minetest.get_perlin_map(multi_map.global_2d_params[name][target_layer], chulenxz)
-		local map1 = noise1:get2dMap_flat(minposxz)
 		local map2 = noise2:get2dMap_flat(opposite_minposxz)
 
+		return map2
+
+	elseif multi_map.in_mixing_area(minposxz) then
+		if multi_map.world_edge.POSITIVE_X == edge then
+			opposite_minposxz.x = -30912
+		elseif multi_map.world_edge.POSITIVE_Z == edge then
+			opposite_minposxz.y = -30912
+		end
+
 		if multi_map.world_edge.NEGATIVE_X == edge then
-			return multi_map.mix_noise_map_x(map2, map1, minposxz)
+			local noise2 = minetest.get_perlin_map(multi_map.global_2d_params[name][target_layer], chulenxz)
+			local map2 = noise2:get2dMap_flat(opposite_minposxz)
+			return map2
 		elseif multi_map.world_edge.POSITIVE_X == edge then
+			local noise1 = minetest.get_perlin_map(multi_map.global_2d_params[name][layer], chulenxz)
+			local noise2 = minetest.get_perlin_map(multi_map.global_2d_params[name][target_layer], chulenxz)
+			local map1 = noise1:get2dMap_flat(minposxz)
+			local map2 = noise2:get2dMap_flat(opposite_minposxz)
 			return multi_map.mix_noise_map_x(map1, map2, minposxz)
 		elseif multi_map.world_edge.NEGATIVE_Z == edge then
-			return multi_map.mix_noise_map_z(map2, map1, minposxz)
+			local noise2 = minetest.get_perlin_map(multi_map.global_2d_params[name][target_layer], chulenxz)
+			local map2 = noise2:get2dMap_flat(opposite_minposxz)
+			return map2
 		elseif multi_map.world_edge.POSITIVE_Z == edge then
-			return multi_map.mix_noise_map_x(map1, map2, minposxz)
+			local noise1 = minetest.get_perlin_map(multi_map.global_2d_params[name][layer], chulenxz)
+			local noise2 = minetest.get_perlin_map(multi_map.global_2d_params[name][target_layer], chulenxz)
+			local map1 = noise1:get2dMap_flat(minposxz)
+			local map2 = noise2:get2dMap_flat(opposite_minposxz)
+			return multi_map.mix_noise_map_z(map2, map1, minposxz)
 		end
 	else
 		return nil
@@ -189,16 +198,49 @@ function multi_map.mix_noise_map_z(map1, map2, minposxz)
 	local new_map = {}
 	local nixz = 1
 
-	for y = minposxz.y, minposxz.y + 80 do
-		local weight_index = 1
-		for x = minposxz.x, minposxz.x + 80 do
-			new_map[nixz] = ( map1[nixz] * (1 - (weight_index / 160)) ) + ( map2[nixz] * (weight_index / 160) )
+	local weight_index = 79
+	for y = minposxz.y, minposxz.y + 79 do
+		for x = minposxz.x, minposxz.x + 79 do
+			new_map[nixz] = ( map1[nixz] * (1 - (weight_index / 80)) ) + ( map2[nixz] * (weight_index / 80) )
 			nixz = nixz + 1
 		end
-		weight_index = weight_index + 1
-		nixz = nixz - 80
+		weight_index = weight_index - 1
 	end
 
 	return new_map
 
 end
+
+local timer = 0
+minetest.register_globalstep(function(dtime)
+	timer = timer + dtime;
+	if timer >= 0.5 then
+		for _,player in ipairs(minetest.get_connected_players()) do
+			local posxz = { x = player:get_pos().x, y = player:get_pos().z }
+			local edge = multi_map.get_which_world_edge(posxz)
+			if edge then
+				local layer = multi_map.get_layer(player:get_pos().y)
+				local target_layer = multi_map.get_linked_layer(layer, edge)
+				if target_layer then
+					if posxz.x > 30927 - 79 then
+						local ydiff = (target_layer - layer) * multi_map.layer_height
+						player:set_pos({ x = 240 + posxz.x - 61840, y = player:get_pos().y + ydiff, z = player:get_pos().z })
+					end
+					if posxz.x < -30912 + 160 then
+						local ydiff = (target_layer - layer) * multi_map.layer_height
+						player:set_pos({ x = -240 + posxz.x + 61840, y = player:get_pos().y + ydiff, z = player:get_pos().z })
+					end
+					if posxz.y > 30927 - 79 then
+						local ydiff = (target_layer - layer) * multi_map.layer_height
+						player:set_pos({ x = player:get_pos().x, y = player:get_pos().y + ydiff, z = 240 + posxz.y - 61840 })
+					end
+					if posxz.y < -30912 + 160 then
+						local ydiff = (target_layer - layer) * multi_map.layer_height
+						player:set_pos({ x = player:get_pos().x, y = player:get_pos().y + ydiff, z = -240 + posxz.y + 61840 })
+					end
+				end
+			end
+		end
+		timer = 0
+	end
+end)

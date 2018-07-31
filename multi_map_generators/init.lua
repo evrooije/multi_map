@@ -23,8 +23,8 @@ multi_map.register_generator(18, mmgen_testauri.generate)
 multi_map.register_generator(19, mmgen_testauri.generate)
 multi_map.register_generator(20, mmgen_testauri.generate)
 
---multi_map.register_linked_layer(19, multi_map.world_edge.POSITIVE_X, 20, true)
---multi_map.register_linked_layer(19, multi_map.world_edge.NEGATIVE_X, 18, true)
+multi_map.register_linked_layer(19, multi_map.world_edge.POSITIVE_Z, 20, true)
+multi_map.register_linked_layer(19, multi_map.world_edge.NEGATIVE_Z, 18, true)
 
 --multi_map.register_generator(9, mmgen_simple.generate, { nodetype = "default:sandstone", height = 0 })
 --multi_map.register_generator(9, mmgen_simple.generate, { nodetype = "default:sandstone", height = 1 })

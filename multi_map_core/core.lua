@@ -70,7 +70,6 @@ function multi_map.get_layer_name_y(y)
 	end
 end
 
-
 -- Get the absolute y center centerpoint for a given layer
 -- current_layer = the layer for which to calculate the centerpoint, or if nil the current layer that multi_map is processing
 function multi_map.get_absolute_centerpoint(current_layer)
@@ -377,17 +376,7 @@ multi_map.node = setmetatable({}, {
 -- Simple init, does a sanity check of the settings and sets the mapgen to singlenode
 minetest.register_on_mapgen_init(function(mapgen_params)
 	minetest.set_mapgen_params({mgname="singlenode"})
-end)
-
-local firstrun = true
-
-function multi_map.initialized()
-	return not firstrun
-end
-
--- Here all the magic (or should I say mess...) happens!
-minetest.register_on_generated(function(minp, maxp)
-	if firstrun then
+	minetest.after(0, function()
 		multi_map.layer_height = multi_map.layer_height_chunks * 80
 		multi_map.layers_start = multi_map.layers_start_chunk * 80
 		multi_map.half_layer_height = multi_map.layer_height / 2
@@ -400,9 +389,11 @@ minetest.register_on_generated(function(minp, maxp)
 		minetest.log("action", "[multi_map] First on_generated call started, module state:")
 		minetest.log("action", "[multi_map]")
 		multi_map.log_state()
-		firstrun = false
-	end
+	end)
+end)
 
+-- Here all the magic (or should I say mess...) happens!
+minetest.register_on_generated(function(minp, maxp)
 	multi_map.set_current_layer(minp.y)
 	local sidelen = maxp.x - minp.x + 1
 
@@ -420,12 +411,9 @@ minetest.register_on_generated(function(minp, maxp)
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
 		local vm_data = vm:get_data()
 
-		local skip = false
 		if multi_map.override_bedrock_generator then
-			skip = multi_map.override_bedrock_generator(multi_map.current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp)
-		end
-
-		if not skip then
+			multi_map.override_bedrock_generator(multi_map.current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp)
+		else
 			multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.node[multi_map.bedrock])
 
 			vm:set_data(vm_data)
@@ -441,12 +429,9 @@ minetest.register_on_generated(function(minp, maxp)
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
 		local vm_data = vm:get_data()
 
-		local skip = false
 		if multi_map.override_skyrock_generator then
-			skip = multi_map.override_skyrock_generator(multi_map.current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp)
-		end
-
-		if not skip then
+			multi_map.override_skyrock_generator(multi_map.current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp)
+		else
 			multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.node[multi_map.skyrock])
 
 			vm:set_lighting({day=15, night=0})
@@ -454,6 +439,14 @@ minetest.register_on_generated(function(minp, maxp)
 			vm:calc_lighting(false)
 			vm:write_to_map(false)
 		end
+	elseif multi_map.wrap_layers and multi_map.in_skip_area({ x = minp.x, y = minp.z }) then
+		local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
+		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
+		local vm_data = vm:get_data()
+		multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.node["multi_map_core:skyrock"])
+		vm:set_data(vm_data)
+		vm:calc_lighting(false)
+		vm:write_to_map(false)
 	else
 		local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
