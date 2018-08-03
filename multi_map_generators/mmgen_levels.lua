@@ -31,29 +31,32 @@ local LUXCHA = 1 / 9 ^ 3
 
 -- 3D noise
 
-local np_terrain = {
-	offset = 0,
-	scale = 1,
-	spread = {x=384, y=192, z=384},
-	seed = 5900033,
-	octaves = 5,
-	persist = 0.63,
-	lacunarity = 2.0,
-	--flags = ""
-}
+multi_map.register_global_3dmap(
+	"terrain", {
+		offset = 0,
+		scale = 1,
+		spread = {x=384, y=192, z=384},
+		seed = 5900033,
+		octaves = 5,
+		persist = 0.63,
+		lacunarity = 2.0,
+	}
+)
 
 -- 2D noise
 
-local np_spike = {
-	offset = 0,
-	scale = 1,
-	spread = {x=128, y=128, z=128},
-	seed = -188900,
-	octaves = 3,
-	persist = 0.5,
-	lacunarity = 2.0,
-	flags = "noeased"
-}
+multi_map.register_global_2dmap(
+	"spike", {
+		offset = 0,
+		scale = 1,
+		spread = {x=128, y=128, z=128},
+		seed = -188900,
+		octaves = 3,
+		persist = 0.5,
+		lacunarity = 2.0,
+		flags = "noeased"
+	}
+)
 
 -- Nodes
  
@@ -86,20 +89,12 @@ minetest.register_node("multi_map_generators:luxore", {
 
 local floatper = math.pi / FLOATPER
 
--- Set mapgen parameters
+-- Generate function
 
-minetest.register_on_mapgen_init(function(mgparams)
-	minetest.set_mapgen_params({mgname="singlenode", flags="nolight"})
-end)
+function mmgen_levels.generate(current_layer, vm, area, data, minp, maxp, offset_minp, offset_maxp, params)
 
--- Initialize noise objects to nil
+	if not params then params = {} end
 
-local nobj_terrain = nil
-local nobj_spike = nil
-
--- On generated function
-
-function mmgen_levels.generate(current_layer, vm, area, data, minp, maxp, offset_minp, offset_maxp)
 	local x1 = maxp.x
 	local y1 = maxp.y
 	local z1 = maxp.z
@@ -126,11 +121,8 @@ function mmgen_levels.generate(current_layer, vm, area, data, minp, maxp, offset
 	local minpos3d = {x=x0, y=y0-16, z=z0}
 	local minpos2d = {x=x0, y=z0}
 	
-	nobj_terrain = nobj_terrain or minetest.get_perlin_map(np_terrain, chulens3d)
-	nobj_spike = nobj_spike or minetest.get_perlin_map(np_spike, chulens2d)
-	
-	local nvals_terrain = nobj_terrain:get3dMap_flat(minpos3d)
-	local nvals_spike = nobj_spike:get2dMap_flat(minpos2d)
+	local nvals_terrain = multi_map.get_global_3dmap_flat("terrain", chulens3d, minpos3d)
+	local nvals_spike = multi_map.get_global_2dmap_flat("spike", chulens2d, minpos2d)
 
 	local ni3d = 1
 	local ni2d = 1
@@ -153,25 +145,25 @@ function mmgen_levels.generate(current_layer, vm, area, data, minp, maxp, offset
 				local n_terrain = nvals_terrain[ni3d]
 				local n_spike = nvals_spike[ni2d]
 				local spikeoff = 0
-				if n_spike > TSPIKE then
-					spikeoff = (n_spike - TSPIKE) ^ 4 * SPIKEAMP
+				if n_spike > (params.tspike or TSPIKE) then
+					spikeoff = (n_spike - (params.tspike or TSPIKE)) ^ 4 * (params.spikeamp or SPIKEAMP)
 				end
-				local grad = (YSURFCEN - relative_y) / TERSCA + spikeoff
-				if relative_y > YSURFMAX then
+				local grad = ((params.ysurfcen or YSURFCEN) - relative_y) / (params.tersca or TERSCA) + spikeoff
+				if relative_y > (params.ysurfmax or YSURFMAX) then
 					grad = math.max(
-						-FLOATFAC * math.abs(math.cos((relative_y - YSURFMAX) * floatper)),
+						(-1 * (params.floatfac or FLOATFAC)) * math.abs(math.cos((relative_y - (params.ysurfmax or YSURFMAX)) * floatper)),
 						grad
 					)
-				elseif relative_y < YSURFMIN then
+				elseif relative_y < (params.ysurfmin or YSURFMIN) then
 					grad = math.min(
-						UNDERFAC * (relative_y - YUNDERCEN) ^ 2 + UNDEROFF,
+						(params.underfac or UNDERFAC) * (relative_y - (params.yundercen or YUNDERCEN)) ^ 2 + (params.underoff or UNDEROFF),
 						grad
 					)
 				end
 				local density = n_terrain + grad
 
 				if y < y0 then
-					if density >= TSTONE then
+					if density >= (params.tstone or TSTONE) then
 						stable[si] = stable[si] + 1
 					elseif density <= 0 then
 						stable[si] = 0
@@ -187,8 +179,8 @@ function mmgen_levels.generate(current_layer, vm, area, data, minp, maxp, offset
 						end
 					end
 				elseif y >= y0 and y <= y1 then
-					if density >= TSTONE then
-						if math.random() < LUXCHA and relative_y < YSURFMIN
+					if density >= (params.tstone or TSTONE) then
+						if math.random() < (params.luxcha or LUXCHA) and relative_y < (params.ysurfmin or YSURFMIN)
 						and density < 0.01 and data[viu] == c_stone then
 							data[vi] = c_luxore
 						else
@@ -196,20 +188,20 @@ function mmgen_levels.generate(current_layer, vm, area, data, minp, maxp, offset
 						end
 						stable[si] = stable[si] + 1
 						under[si] = 0
-					elseif density > 0 and density < TSTONE
-					and stable[si] >= STABLE and relative_y > YSURFMIN then
-						if relative_y <= YSAND then
+					elseif density > 0 and density < (params.tstone or TSTONE)
+					and stable[si] >= (params.stable or STABLE) and relative_y > (params.ysurfmin or YSURFMIN) then
+						if relative_y <= (params.ysand or YSAND) then
 							data[vi] = c_sand
 							under[si] = 0
 						else
 							data[vi] = c_dirt
 							under[si] = 1
 						end
-					elseif relative_y > YSURFMIN and relative_y <= YWATER then
+					elseif relative_y > (params.ysurfmin or YSURFMIN) and relative_y <= (params.ywater or YWATER) then
 						data[vi] = c_water
 						stable[si] = 0
 						under[si] = 0
-					elseif relative_y <= YLAVA then
+					elseif relative_y <= (params.ylava or YLAVA) then
 						data[vi] = c_lava
 						stable[si] = 0
 						under[si] = 0
@@ -221,7 +213,7 @@ function mmgen_levels.generate(current_layer, vm, area, data, minp, maxp, offset
 						under[si] = 0
 					end
 				elseif y == y1 + 1 then
-					if density <= 0 and relative_y > YWATER then -- air, possibly just above surface
+					if density <= 0 and relative_y > (params.ywater or YWATER) then -- air, possibly just above surface
 						if under[si] == 1 then
 							data[viu] = c_grass
 						end

@@ -19,6 +19,18 @@ multi_map.layer_height_chunks = 20
 multi_map.wrap_layers = true
 
 multi_map.register_fallback_generator(mmgen_simple.generate)
+
+multi_map.register_generator(0, mmgen_testauri.generate)
+multi_map.register_generator(1, mmgen_testauri.generate)
+
+multi_map.set_layer_params(0,
+	{ name = "Bottom World 1", generate_bedrock = false, generate_skyrock = false, generate_shadow_caster = true })
+
+multi_map.set_layer_params(1,
+	{ name = "Bottom World 2", generate_bedrock = false, generate_skyrock = true })
+
+multi_map.register_generator(2, mmgen_levels.generate)
+
 multi_map.register_generator(18, mmgen_testauri.generate)
 multi_map.register_generator(19, mmgen_testauri.generate)
 multi_map.register_generator(20, mmgen_testauri.generate)

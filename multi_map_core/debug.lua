@@ -20,7 +20,11 @@ function multi_map.log_state()
 		minetest.log("action", "[multi_map]  - "..name.." "..debug.getinfo(multi_map.fallback_generator.generator).short_src:match("^.+/(.+)$").." (fallback)")
 	end
 	for k,v in pairs(multi_map.generators) do
-		local name = multi_map.layer_names[k]
+		local name
+		if multi_map.layers[k] and multi_map.layers[k].name then
+			name = multi_map.layers[k].name
+		end
+		
 		if name then
 			name = "\""..name.."\","
 		else

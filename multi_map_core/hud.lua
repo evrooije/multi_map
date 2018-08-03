@@ -33,8 +33,8 @@ function multi_map.update_hud(player)
 
 	local player_name = player:get_player_name()
 
-	local layer = multi_map.get_layer(player:get_pos().y)
-	local offset_y = multi_map.get_offset_y(player:get_pos().y, layer)
+	local layer = multi_map.get_layer(player:get_pos().y + 0.5)
+	local offset_y = multi_map.get_offset_y(player:get_pos().y, layer) + 0.5
 
 	local hud_text = ""
 

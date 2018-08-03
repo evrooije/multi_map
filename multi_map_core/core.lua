@@ -24,14 +24,12 @@ multi_map.generate_bedrock = true
 multi_map.generate_skyrock = true
 multi_map.generate_shadow_caster = true
 
-multi_map.override_bedrock_generator = nil
-multi_map.override_skyrock_generator = nil
-
+-- Table with layer specific configuration
+multi_map.layers = {}
 -- Table with generator chains
 multi_map.generators = {}
 -- When no suitable generator is found, this generator is used as a fallback
 multi_map.fallback_generator = nil
-multi_map.layer_names = {}
 
 -- Set the current layer which the mapgen is generating
 -- y = absolute y value to be translated to layer
@@ -63,8 +61,8 @@ end
 -- y = absolute y value to be translated to layer
 function multi_map.get_layer_name_y(y)
 	local l = multi_map.get_layer(y)
-	if l then
-		return multi_map.layer_names[l]
+	if l and multi_map.layers[l] and multi_map.layers[l].name then
+		return multi_map.layers[l].name
 	else
 		return tostring(l)
 	end
@@ -263,6 +261,10 @@ function multi_map.register_fallback_generator(...)
 	multi_map.fallback_generator = { name = name, generator = generator, arguments = arguments }
 end
 
+function multi_map.set_layer_params(layer, layer_params)
+	multi_map.layers[layer] = layer_params
+end
+
 -- Register a generator for all if position is left out or one layer if position is specified
 -- position = the optional layer for which call this generator
 -- generator = the function to call
@@ -308,18 +310,11 @@ function multi_map.register_generator(...)
 	end
 end
 
--- Set a nice name for this layer, e.g. to use for display on the HUD
--- layer = the layer number
--- name = the name to give to this layer
-function multi_map.set_layer_name(layer, name)
-	multi_map.layer_names[layer] = name
-end
-
 -- Get the layer name, e.g. to use for display on the HUD
 -- layer = the layer number
 function multi_map.get_layer_name(layer)
-	if multi_map.layer_names[layer] then
-		return multi_map.layer_names[layer]
+	if multi_map.layers[layer] and multi_map.layers[layer].name then
+		return multi_map.layers[layer].name
 	elseif multi_map.fallback_generator then
 		return multi_map.fallback_generator.name
 	end
@@ -404,23 +399,56 @@ minetest.register_on_generated(function(minp, maxp)
 	local offset_minp = { x = minp.x, y = multi_map.get_offset_y(minp.y), z = minp.z }
 	local offset_maxp = { x = maxp.x, y = multi_map.get_offset_y(maxp.y), z = maxp.z }
 
-	if  multi_map.generate_bedrock and
+	local generate_bedrock = multi_map.generate_bedrock
+	local generate_skyrock = multi_map.generate_skyrock
+	
+	if multi_map.generate_bedrock then
+		if multi_map.layers[multi_map.current_layer] and
+		   not multi_map.layers[multi_map.current_layer].generate_bedrock
+		then
+			generate_bedrock = false
+		end
+	else
+		if multi_map.layers[multi_map.current_layer] and
+		   multi_map.layers[multi_map.current_layer].generate_bedrock
+		then
+			generate_bedrock = true
+		end
+	end 
+
+	if multi_map.generate_skyrock then
+		if multi_map.layers[multi_map.current_layer] and
+		   not multi_map.layers[multi_map.current_layer].generate_skyrock
+		then
+			generate_skyrock = false
+		end
+	else
+		if multi_map.layers[multi_map.current_layer] and
+		   multi_map.layers[multi_map.current_layer].generate_skyrock
+		then
+			generate_skyrock = true
+		end
+	end 
+
+	if  generate_bedrock and
 		multi_map.map_min + multi_map.layers_start + (multi_map.layer_height * multi_map.current_layer) == minp.y
 	then
 		local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
 		local vm_data = vm:get_data()
 
-		if multi_map.override_bedrock_generator then
-			multi_map.override_bedrock_generator(multi_map.current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp)
+		if	multi_map.layers[multi_map.current_layer] and
+			multi_map.layers[multi_map.current_layer].bedrock_generator
+		then
+			multi_map.layers[multi_map.current_layer].bedrock_generator(multi_map.current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp)
 		else
 			multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.node[multi_map.bedrock])
-
-			vm:set_data(vm_data)
-			vm:calc_lighting(false)
-			vm:write_to_map(false)
 		end
-	elseif	multi_map.generate_skyrock
+		vm:set_data(vm_data)
+		vm:calc_lighting(false)
+		vm:write_to_map(false)
+
+	elseif	generate_skyrock
 			and (multi_map.map_min + multi_map.layers_start + (multi_map.layer_height * (multi_map.current_layer + 1)) - 80 == minp.y or
 				 multi_map.map_min + multi_map.layers_start + (multi_map.layer_height * (multi_map.current_layer + 1)) - 160 == minp.y
 			)
@@ -429,16 +457,18 @@ minetest.register_on_generated(function(minp, maxp)
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
 		local vm_data = vm:get_data()
 
-		if multi_map.override_skyrock_generator then
-			multi_map.override_skyrock_generator(multi_map.current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp)
+		if	multi_map.layers[multi_map.current_layer] and
+			multi_map.layers[multi_map.current_layer].skyrock_generator
+		then
+			multi_map.layers[multi_map.current_layer].skyrock_generator(multi_map.current_layer, vm, area, vm_data, minp, maxp, offset_minp, offset_maxp)
 		else
 			multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.node[multi_map.skyrock])
-
-			vm:set_lighting({day=15, night=0})
-			vm:set_data(vm_data)
-			vm:calc_lighting(false)
-			vm:write_to_map(false)
 		end
+		vm:set_lighting({day=15, night=0})
+		vm:set_data(vm_data)
+		vm:calc_lighting(false)
+		vm:write_to_map(false)
+
 	elseif multi_map.wrap_layers and multi_map.in_skip_area({ x = minp.x, y = minp.z }) then
 		local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
@@ -453,8 +483,10 @@ minetest.register_on_generated(function(minp, maxp)
 		local vm_data = vm:get_data()
 		local remove_shadow_caster = false
 
-		-- Add a temporary stone layer above the chunk to ensure caves are dark
-		if multi_map.generate_shadow_caster and multi_map.get_absolute_centerpoint() >= maxp.y then
+		-- Add a temporary shadow caster layer above the chunk to ensure caves are dark
+		if (multi_map.generate_shadow_caster and multi_map.get_absolute_centerpoint() >= maxp.y) or
+		   (multi_map.layers[multi_map.current_layer] and multi_map.layers[multi_map.current_layer].generate_shadow_caster)
+		then
 			if vm_data[area:index(minp.x, maxp.y + 1, minp.z)] == multi_map.node["ignore"] then
 				remove_shadow_caster = true
 				multi_map.generate_singlenode_plane(minp, maxp, area, vm_data, maxp.y + 1, multi_map.node["multi_map_core:shadow_caster"])

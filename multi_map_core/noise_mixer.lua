@@ -214,7 +214,7 @@ end
 local timer = 0
 minetest.register_globalstep(function(dtime)
 	timer = timer + dtime;
-	if timer >= 0.5 then
+	if timer >= 1 then
 		for _,player in ipairs(minetest.get_connected_players()) do
 			local posxz = { x = player:get_pos().x, y = player:get_pos().z }
 			local edge = multi_map.get_which_world_edge(posxz)
