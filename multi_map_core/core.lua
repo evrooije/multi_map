@@ -70,9 +70,9 @@ end
 
 -- Get the absolute y center centerpoint for a given layer
 -- current_layer = the layer for which to calculate the centerpoint, or if nil the current layer that multi_map is processing
-function multi_map.get_absolute_centerpoint(current_layer)
-	if current_layer then
-		return multi_map.map_min + multi_map.layers_start + (current_layer * multi_map.layer_height) + multi_map.half_layer_height
+function multi_map.get_absolute_centerpoint(layer)
+	if layer then
+		return multi_map.map_min + multi_map.layers_start + (layer * multi_map.layer_height) + multi_map.half_layer_height
 	else
 		return multi_map.map_min + multi_map.layers_start + (multi_map.current_layer * multi_map.layer_height) + multi_map.half_layer_height
 	end
@@ -80,10 +80,10 @@ end
 
 -- Get the offset y position, i.e. the y relative to the current layer's center point
 -- y = absolute y value to be translated to y relative to layer center point
-function multi_map.get_offset_y(y, current_layer)
+function multi_map.get_offset_y(y, layer)
 	local l
-	if current_layer then
-		l = current_layer
+	if layer then
+		l = layer
 	else
 		l = multi_map.current_layer
 	end
@@ -99,7 +99,7 @@ function multi_map.get_offset_y(y, current_layer)
 	elseif center_point < 0 and y < 0 then
 		return math.abs(center_point) - math.abs(y)
 	elseif center_point > 0 and y < 0 then
-		return math.abs(y) - math.abs(center_point)
+		return y - center_point -- 100, -80 -> 80 -100
 	else
 		return center_point - y
 	end
@@ -108,9 +108,9 @@ end
 -- Get the absolute y position from a relative offset position
 -- y = relative y value to be translated to absolute world y position
 -- current_layer = the layer we are in or if nil the current layer multi_map is processing
-function multi_map.get_absolute_y(y, current_layer)
-	if current_layer then
-		local center_point = multi_map.map_min + multi_map.layers_start + (current_layer * multi_map.layer_height) + multi_map.half_layer_height
+function multi_map.get_absolute_y(y, layer)
+	if layer then
+		local center_point = multi_map.map_min + multi_map.layers_start + (layer * multi_map.layer_height) + multi_map.half_layer_height
 		return y - center_point
 	else
 		local center_point = multi_map.map_min + multi_map.layers_start + (multi_map.current_layer * multi_map.layer_height) + multi_map.half_layer_height
@@ -370,7 +370,7 @@ multi_map.node = setmetatable({}, {
 
 -- Simple init, does a sanity check of the settings and sets the mapgen to singlenode
 minetest.register_on_mapgen_init(function(mapgen_params)
-	minetest.set_mapgen_params({mgname="singlenode"})
+	minetest.set_mapgen_params({mgname="singlenode", flags="nolight"})
 	minetest.after(0, function()
 		multi_map.layer_height = multi_map.layer_height_chunks * 80
 		multi_map.layers_start = multi_map.layers_start_chunk * 80
@@ -404,13 +404,13 @@ minetest.register_on_generated(function(minp, maxp)
 	
 	if multi_map.generate_bedrock then
 		if multi_map.layers[multi_map.current_layer] and
-		   not multi_map.layers[multi_map.current_layer].generate_bedrock
+		   multi_map.layers[multi_map.current_layer].generate_bedrock == false
 		then
 			generate_bedrock = false
 		end
 	else
 		if multi_map.layers[multi_map.current_layer] and
-		   multi_map.layers[multi_map.current_layer].generate_bedrock
+		   multi_map.layers[multi_map.current_layer].generate_bedrock == true
 		then
 			generate_bedrock = true
 		end
@@ -418,13 +418,13 @@ minetest.register_on_generated(function(minp, maxp)
 
 	if multi_map.generate_skyrock then
 		if multi_map.layers[multi_map.current_layer] and
-		   not multi_map.layers[multi_map.current_layer].generate_skyrock
+		   multi_map.layers[multi_map.current_layer].generate_skyrock == false
 		then
 			generate_skyrock = false
 		end
 	else
 		if multi_map.layers[multi_map.current_layer] and
-		   multi_map.layers[multi_map.current_layer].generate_skyrock
+		   multi_map.layers[multi_map.current_layer].generate_skyrock == true
 		then
 			generate_skyrock = true
 		end
@@ -485,7 +485,7 @@ minetest.register_on_generated(function(minp, maxp)
 
 		-- Add a temporary shadow caster layer above the chunk to ensure caves are dark
 		if (multi_map.generate_shadow_caster and multi_map.get_absolute_centerpoint() >= maxp.y) or
-		   (multi_map.layers[multi_map.current_layer] and multi_map.layers[multi_map.current_layer].generate_shadow_caster)
+		   (multi_map.layers[multi_map.current_layer] and multi_map.layers[multi_map.current_layer].generate_shadow_caster == true)
 		then
 			if vm_data[area:index(minp.x, maxp.y + 1, minp.z)] == multi_map.node["ignore"] then
 				remove_shadow_caster = true
@@ -510,17 +510,17 @@ minetest.register_on_generated(function(minp, maxp)
 
 		vm:set_data(vm_data)
 		vm:calc_lighting()
-		vm:write_to_map()
-		vm:update_liquids()
 
 		-- Remove the temporary stone shadow casting layer again, if needed
 		if remove_shadow_caster then
 			if vm_data[area:index(minp.x, maxp.y + 1, minp.z)] == multi_map.node["multi_map_core:shadow_caster"] then
 				multi_map.generate_singlenode_plane(minp, maxp, area, vm_data, maxp.y + 1, multi_map.node["ignore"])
 				vm:set_data(vm_data)
-				vm:write_to_map()
 			end
 		end
+
+		vm:write_to_map()
+		vm:update_liquids()
 
 	end
 
