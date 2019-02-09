@@ -31,6 +31,8 @@ multi_map.generators = {}
 -- When no suitable generator is found, this generator is used as a fallback
 multi_map.fallback_generator = nil
 
+local vm_data = {} -- reuse the massive VoxelManip memory buffer instead of creating on every on_generate()
+
 -- Set the current layer which the mapgen is generating
 -- y = absolute y value to be translated to layer
 function multi_map.set_current_layer(y)
@@ -322,7 +324,7 @@ minetest.register_on_generated(function(minp, maxp)
 	then
 		local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
-		local vm_data = vm:get_data()
+		vm:get_data(vm_data)
 
 		if	multi_map.layers[multi_map.current_layer] and
 			multi_map.layers[multi_map.current_layer].bedrock_generator
@@ -342,7 +344,7 @@ minetest.register_on_generated(function(minp, maxp)
 	then
 		local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
-		local vm_data = vm:get_data()
+		vm:get_data(vm_data)
 
 		if	multi_map.layers[multi_map.current_layer] and
 			multi_map.layers[multi_map.current_layer].skyrock_generator
@@ -359,7 +361,7 @@ minetest.register_on_generated(function(minp, maxp)
 	elseif multi_map.wrap_layers and multi_map.in_skip_area({ x = minp.x, y = minp.z }) then
 		local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
-		local vm_data = vm:get_data()
+		vm:get_data(vm_data)
 		multi_map.generate_singlenode_chunk(minp, maxp, area, vm_data, multi_map.node["multi_map_core:skyrock"])
 		vm:set_data(vm_data)
 		vm:calc_lighting(false)
@@ -367,7 +369,7 @@ minetest.register_on_generated(function(minp, maxp)
 	else
 		local vm, emin, emax = minetest.get_mapgen_object("voxelmanip")
 		local area = VoxelArea:new({MinEdge = emin, MaxEdge = emax})
-		local vm_data = vm:get_data()
+		vm:get_data(vm_data)
 		local remove_shadow_caster = false
 
 		-- Add a temporary shadow caster layer above the chunk to ensure caves are dark
